@@ -84,3 +84,6 @@ function entrarMesa(num) {
     cargarOrdenesMesa();
   }
   
+  app.get('/', (req, res) => {
+  res.send('API funcionando correctamente');
+});
