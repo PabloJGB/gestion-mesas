@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Gestión de Mesas y Órdenes</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+
+    h1 {
+      margin-bottom: 20px;
+    }
+
+    #listaMesas {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding-left: 0;
+      margin-bottom: 20px;
+    }
+
+    #listaMesas li {
+      background-color: #007bff;
+      color: white;
+      padding: 10px 16px;
+      border-radius: 5px;
+      cursor: pointer;
+      list-style: none;
+      transition: background-color 0.2s ease;
+      user-select: none;
+    }
+
+    #listaMesas li:hover {
+      background-color: #0056b3;
+    }
+
+    #listaMesas li.selected {
+      background-color: #28a745;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 20px;
+    }
+
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: left;
+    }
+
+    th {
+      background-color: #f4f4f4;
+    }
+
+    input[type="text"], input[type="number"] {
+      padding: 5px;
+      width: 150px;
+    }
+
+    button {
+      padding: 6px 12px;
+      margin: 2px;
+      cursor: pointer;
+    }
+
+    form > div {
+      margin-bottom: 10px;
+    }
+
+    #ordenesSection {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Gestión de Mesas y Órdenes</h1>
+
+  <!-- Lista dinámica de mesas -->
+  <ul id="listaMesas"></ul>
+
+  <!-- Sección de órdenes para la mesa seleccionada -->
+  <section id="ordenesSection">
+    <h2>Órdenes de la Mesa <span id="mesaSeleccionada"></span></h2>
+
+    <form id="ordenForm">
+      <input type="hidden" id="ordenId" />
+      <div>
+        <label for="producto">Producto:</label>
+        <input type="text" id="producto" name="producto" required />
+      </div>
+      <div>
+        <label for="cantidad">Cantidad:</label>
+        <input type="number" id="cantidad" name="cantidad" min="1" required />
+      </div>
+      <button type="submit">Guardar Orden</button>
+      <button type="button" id="cancelEdit" style="display:none;">Cancelar</button>
+    </form>
+
+    <table id="ordenesTable">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Producto</th>
+          <th>Cantidad</th>
+          <th>Fecha</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Aquí van las órdenes -->
+      </tbody>
+    </table>
+
+    <button id="volverMesa">Volver a selección de mesa</button>
+  </section>
+
+  <script>
+    const API_URL = 'http://localhost:3000/ordenes';
+    const MESAS_URL = 'http://localhost:3000/mesas';
+
+    const listaMesas = document.getElementById('listaMesas');
+    const ordenesSection = document.getElementById('ordenesSection');
+    const mesaSeleccionadaSpan = document.getElementById('mesaSeleccionada');
+
+    const ordenForm = document.getElementById('ordenForm');
+    const ordenIdInput = document.getElementById('ordenId');
+    const productoInput = document.getElementById('producto');
+    const cantidadInput = document.getElementById('cantidad');
+    const cancelEditBtn = document.getElementById('cancelEdit');
+    const ordenesTableBody = document.querySelector('#ordenesTable tbody');
+
+    let mesaActual = null;
+
+    // Escape para texto HTML seguro
+    function escapeHtml(text) {
+      return text.replace(/&/g, "&amp;")
+                 .replace(/</g, "&lt;")
+                 .replace(/>/g, "&gt;")
+                 .replace(/"/g, "&quot;")
+                 .replace(/'/g, "&#039;");
+    }
+
+    // Escape para insertar texto en JS inline (para onclick)
+    function escapeJs(text) {
+      return text.replace(/'/g, "\\'").replace(/"/g, '\\"');
+    }
+
+    // Cargar la lista de mesas desde la API
+    async function cargarMesas() {
+      try {
+        const res = await fetch(MESAS_URL);
+        const mesas = await res.json();
+
+        listaMesas.innerHTML = '';
+        mesas.forEach(mesa => {
+          // Aquí asegúrate que mesa.numero exista y sea un número válido
+          const numeroMesa = mesa.numero ?? mesa; // en caso que el backend devuelva solo números sin objeto
+          const li = document.createElement('li');
+          li.textContent = `Mesa ${numeroMesa}`;
+          li.dataset.numero = numeroMesa;
+          li.addEventListener('click', () => seleccionarMesa(numeroMesa));
+          listaMesas.appendChild(li);
+        });
+      } catch (error) {
+        alert('Error al cargar mesas');
+        console.error(error);
+      }
+    }
+
+    // Selección de una mesa
+    function seleccionarMesa(numero) {
+      console.log('Mesa seleccionada:', numero);
+      mesaActual = numero;
+      mesaSeleccionadaSpan.textContent = numero;
+      ordenesSection.style.display = 'block';
+      listaMesas.style.display = 'none';
+
+      // Destacar mesa seleccionada en lista (por si vuelve)
+      document.querySelectorAll('#listaMesas li').forEach(li => {
+        li.classList.toggle('selected', li.dataset.numero == numero);
+      });
+
+      cargarOrdenesMesa();
+    }
+
+    // Volver a la selección de mesas
+    document.getElementById('volverMesa').addEventListener('click', () => {
+      mesaActual = null;
+      ordenForm.reset();
+      ordenIdInput.value = '';
+      cancelEditBtn.style.display = 'none';
+      ordenesTableBody.innerHTML = '';
+      ordenesSection.style.display = 'none';
+      listaMesas.style.display = 'flex';
+
+      // Quitar selección visual
+      document.querySelectorAll('#listaMesas li').forEach(li => {
+        li.classList.remove('selected');
+      });
+    });
+
+    // Cargar órdenes de la mesa seleccionada
+    async function cargarOrdenesMesa() {
+      if (!mesaActual) {
+        console.error('No hay mesa seleccionada');
+        return;
+      }
+      console.log('Cargando órdenes para mesa:', mesaActual);
+      try {
+        const res = await fetch(`${API_URL}/mesa/${mesaActual}`);
+        if (!res.ok) {
+          alert(`Error al cargar órdenes: ${res.statusText}`);
+          return;
+        }
+        const ordenes = await res.json();
+
+        ordenesTableBody.innerHTML = '';
+        if (ordenes.length === 0) {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td colspan="5">No hay órdenes para esta mesa.</td>`;
+          ordenesTableBody.appendChild(tr);
+          return;
+        }
+        ordenes.forEach(o => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${o.id}</td>
+            <td>${escapeHtml(o.producto)}</td>
+            <td>${o.cantidad}</td>
+            <td>${new Date(o.fecha).toLocaleString()}</td>
+            <td>
+              <button onclick="editarOrden(${o.id}, '${escapeJs(o.producto)}', ${o.cantidad})">Editar</button>
+              <button onclick="eliminarOrden(${o.id})">Eliminar</button>
+            </td>
+          `;
+          ordenesTableBody.appendChild(tr);
+        });
+      } catch (error) {
+        alert('Error al cargar órdenes');
+        console.error(error);
+      }
+    }
+
+    // Enviar formulario de orden (crear o editar)
+    ordenForm.addEventListener('submit', async e => {
+      e.preventDefault();
+
+      const id = ordenIdInput.value;
+      const producto = productoInput.value.trim();
+      const cantidad = parseInt(cantidadInput.value);
+
+      if (!producto || !cantidad || cantidad < 1) {
+        alert('Por favor completa correctamente los campos.');
+        return;
+      }
+
+      if (!mesaActual) {
+        alert('No hay mesa seleccionada.');
+        return;
+      }
+
+      const ordenData = { mesa: mesaActual, producto, cantidad };
+
+      try {
+        let res;
+        if (id) {
+          res = await fetch(`${API_URL}/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(ordenData)
+          });
+        } else {
+          res = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(ordenData)
+          });
+        }
+
+        if (!res.ok) {
+          alert('Error al guardar la orden.');
+          return;
+        }
+
+        ordenForm.reset();
+        ordenIdInput.value = '';
+        cancelEditBtn.style.display = 'none';
+        cargarOrdenesMesa();
+      } catch (error) {
+        alert('Error al guardar la orden.');
+        console.error(error);
+      }
+    });
+
+    // Cancelar edición
+    cancelEditBtn.addEventListener('click', () => {
+      ordenForm.reset();
+      ordenIdInput.value = '';
+      cancelEditBtn.style.display = 'none';
+    });
+
+    // Editar orden
+    function editarOrden(id, producto, cantidad) {
+      ordenIdInput.value = id;
+      productoInput.value = producto;
+      cantidadInput.value = cantidad;
+      cancelEditBtn.style.display = 'inline-block';
+    }
+
+    // Eliminar orden
+    async function eliminarOrden(id) {
+      if (!confirm('¿Deseas eliminar esta orden?')) return;
+      try {
+        const res = await fetch(`${API_URL}/${id}`, {
+          method: 'DELETE'
+        });
+        if (!res.ok) {
+          alert('Error al eliminar la orden.');
+          return;
+        }
+        cargarOrdenesMesa();
+      } catch (error) {
+        alert('Error al eliminar la orden.');
+        console.error(error);
+      }
+    }
+
+    // Hacer funciones globales para que funcionen en inline onclick
+    window.editarOrden = editarOrden;
+    window.eliminarOrden = eliminarOrden;
+
+    // Inicializar app
+    cargarMesas();
+
+  </script>
+
+</body>
+</html>
+
