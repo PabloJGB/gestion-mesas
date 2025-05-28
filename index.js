@@ -1,96 +1,126 @@
-document.addEventListener('DOMContentLoaded', () => {
-  const recetasSelect = document.getElementById('nombreReceta');
-  const idRecetaInput = document.getElementById('idReceta');
-  const precioInput = document.getElementById('precio');
-  const cantidadInput = document.getElementById('cantidad');
-  const enviarBtn = document.getElementById('enviarBtn');
-  const ordenesBody = document.getElementById('ordenesBody');
+const express = require('express');
+const cors = require('cors');
+const { Pool } = require('pg');
 
-  const mesaActual = 1; // Puedes cambiar esto si manejas varias mesas
+const app = express();
+const port = 3000;
 
-  let recetasMap = {}; // Guardar recetas por nombre para acceso rápido
+app.use(cors());
+app.use(express.json());
 
-  // Obtener recetas y llenar el select
-  fetch('https://backend-mesas.onrender.com/recetas')
-    .then(response => response.json())
-    .then(data => {
-      data.forEach(receta => {
-        recetasMap[receta.nombreReceta] = receta;
-        const option = document.createElement('option');
-        option.value = receta.nombreReceta;
-        option.textContent = receta.nombreReceta;
-        recetasSelect.appendChild(option);
-      });
-    });
+// Conexión a PostgreSQL
+const pool = new Pool({
+  host: 'ep-late-sun-a4jb2jfv-pooler.us-east-1.aws.neon.tech',
+  port: 5432,
+  database: 'neondb',
+  user: 'neondb_owner',
+  password: 'npg_vsX4QGV0ibwu',
+  ssl: { rejectUnauthorized: false }
+});
 
-  // Al seleccionar una receta, precargar ID y precio
-  recetasSelect.addEventListener('change', () => {
-    const recetaSeleccionada = recetasMap[recetasSelect.value];
-    if (recetaSeleccionada) {
-      idRecetaInput.value = recetaSeleccionada.idReceta;
-      precioInput.value = recetaSeleccionada.precio;
-    } else {
-      idRecetaInput.value = '';
-      precioInput.value = '';
-    }
-  });
-
-  // Enviar orden a la base de datos
-  enviarBtn.addEventListener('click', () => {
-    const idReceta = parseInt(idRecetaInput.value);
-    const cantidad = parseInt(cantidadInput.value);
-    const fechaHora = new Date().toISOString().slice(0, 19).replace('T', ' '); // formato: YYYY-MM-DD HH:MM:SS
-
-    if (!idReceta || !cantidad) {
-      alert('Completa todos los campos antes de enviar.');
-      return;
-    }
-
-    const orden = {
-      noMesa: mesaActual,
-      idReceta: idReceta,
-      cantidad: cantidad,
-      fechaHora: fechaHora
-    };
-
-    fetch('https://backend-mesas.onrender.com/ordenes', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(orden)
-    })
-      .then(res => res.text())
-      .then(msg => {
-        alert('Orden enviada');
-        cantidadInput.value = '';
-        recetasSelect.value = '';
-        idRecetaInput.value = '';
-        precioInput.value = '';
-        cargarOrdenes(); // refrescar tabla
-      })
-      .catch(err => console.error('Error al enviar orden:', err));
-  });
-
-  // Cargar órdenes por mesa
-  function cargarOrdenes() {
-    ordenesBody.innerHTML = '';
-    fetch(`https://backend-mesas.onrender.com/ordenes?mesa=${mesaActual}`)
-      .then(response => response.json())
-      .then(data => {
-        data.forEach(orden => {
-          const fila = document.createElement('tr');
-          fila.innerHTML = `
-            <td>${orden.idOrden}</td>
-            <td>${orden.idReceta}</td>
-            <td>${orden.nombreReceta}</td>
-            <td>${orden.precio.toFixed(2)}</td>
-            <td>${orden.cantidad}</td>
-            <td>${orden.fechaHora.replace('T', ' ').slice(0, 19)}</td>
-          `;
-          ordenesBody.appendChild(fila);
-        });
-      });
+// Obtener todas las órdenes
+app.get('/ordenes', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM ordenes ORDER BY no_mesa, id_orden');
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error al obtener órdenes:', error);
+    res.status(500).json({ error: 'Error al obtener órdenes' });
   }
+});
 
-  // Inicial
-  cargarOrdenes();
+// Obtener órdenes por mesa
+app.get('/ordenes/mesa/:mesaNumero', async (req, res) => {
+  const mesa = parseInt(req.params.mesaNumero);
+  try {
+    const resultado = await pool.query(`
+      SELECT 
+        o.id_orden,
+        o.id_receta,
+        r.nombre_receta,
+        r.precio AS precio_receta,
+        o.cantidad,
+        o.fecha_hora
+      FROM ordenes o
+      JOIN recetas r ON o.id_receta = r.id_receta
+      WHERE o.no_mesa = $1
+      ORDER BY o.fecha_hora DESC
+    `, [mesa]);
+
+    res.json(resultado.rows);
+  } catch (error) {
+    console.error('Error al obtener órdenes por mesa:', error);
+    res.status(500).json({ error: 'Error al obtener órdenes por mesa' });
+  }
+});
+
+// Crear orden
+app.post('/ordenes', async (req, res) => {
+  const { no_mesa, id_receta, cantidad } = req.body;
+  try {
+    const result = await pool.query(
+      'INSERT INTO ordenes (no_mesa, id_receta, cantidad, fecha_hora) VALUES ($1, $2, $3, NOW()) RETURNING *',
+      [no_mesa, id_receta, cantidad]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('Error al crear orden:', error);
+    res.status(500).json({ error: 'Error al crear orden' });
+  }
+});
+
+// Actualizar orden
+app.put('/ordenes/:id', async (req, res) => {
+  const id = req.params.id;
+  const { no_mesa, id_receta, cantidad } = req.body;
+  try {
+    const result = await pool.query(
+      'UPDATE ordenes SET no_mesa = $1, id_receta = $2, cantidad = $3 WHERE id_orden = $4 RETURNING *',
+      [no_mesa, id_receta, cantidad, id]
+    );
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error al actualizar orden:', error);
+    res.status(500).json({ error: 'Error al actualizar orden' });
+  }
+});
+
+// Eliminar orden
+app.delete('/ordenes/:id', async (req, res) => {
+  const id = req.params.id;
+  try {
+    await pool.query('DELETE FROM ordenes WHERE id_orden = $1', [id]);
+    res.json({ mensaje: 'Orden eliminada' });
+  } catch (error) {
+    console.error('Error al eliminar orden:', error);
+    res.status(500).json({ error: 'Error al eliminar orden' });
+  }
+});
+
+// Obtener mesas únicas
+app.get('/mesas', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT DISTINCT no_mesa FROM ordenes ORDER BY no_mesa');
+    const mesas = result.rows.map(row => row.no_mesa);
+    res.json(mesas);
+  } catch (error) {
+    console.error('Error al obtener mesas:', error);
+    res.status(500).json({ error: 'Error al obtener mesas' });
+  }
+});
+
+// Obtener recetas
+app.get('/recetas', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT id_receta, nombre_receta, precio FROM recetas ORDER BY nombre_receta');
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error al obtener recetas:', error);
+    res.status(500).json({ error: 'Error al obtener recetas' });
+  }
+});
+
+// Iniciar servidor
+app.listen(port, () => {
+  console.log(`✅ Backend corriendo en http://localhost:${port}`);
 });

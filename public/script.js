@@ -1,107 +1,96 @@
-const mesaSelect = document.getElementById('mesaSelect');
-const entrarMesaBtn = document.getElementById('entrarMesa');
-const mesaSection = document.getElementById('mesaSection');
-const ordenesSection = document.getElementById('ordenesSection');
-const mesaSeleccionadaSpan = document.getElementById('mesaSeleccionada');
-const volverMesaBtn = document.getElementById('volverMesa');
-const ordenesList = document.getElementById('ordenesList');
-const recetaSelect = document.getElementById('id_receta');
+document.addEventListener('DOMContentLoaded', () => {
+  const recetasSelect = document.getElementById('nombreReceta');
+  const idRecetaInput = document.getElementById('idReceta');
+  const precioInput = document.getElementById('precio');
+  const cantidadInput = document.getElementById('cantidad');
+  const enviarBtn = document.getElementById('enviarBtn');
+  const ordenesBody = document.getElementById('ordenesBody');
 
-let mesaActual = null;
+  const mesaActual = 1; // Puedes cambiar esto si manejas varias mesas
 
-async function cargarMesas() {
-  try {
-    const res = await fetch('https://backend-mesas.onrender.com/mesas');
-    const mesas = await res.json();
+  let recetasMap = {}; // Guardar recetas por nombre para acceso rápido
 
-    mesaSelect.innerHTML = '<option value="" disabled selected>Selecciona una mesa</option>';
-    mesas.forEach(mesa => {
-      const option = document.createElement('option');
-      option.value = mesa;
-      option.textContent = mesa;
-      mesaSelect.appendChild(option);
+  // Obtener recetas y llenar el select
+  fetch('https://backend-mesas.onrender.com/recetas')
+    .then(response => response.json())
+    .then(data => {
+      data.forEach(receta => {
+        recetasMap[receta.nombreReceta] = receta;
+        const option = document.createElement('option');
+        option.value = receta.nombreReceta;
+        option.textContent = receta.nombreReceta;
+        recetasSelect.appendChild(option);
+      });
     });
 
-    entrarMesaBtn.disabled = false;
-  } catch (error) {
-    mesaSelect.innerHTML = '<option value="" disabled>Error cargando mesas</option>';
-    console.error(error);
-  }
-}
+  // Al seleccionar una receta, precargar ID y precio
+  recetasSelect.addEventListener('change', () => {
+    const recetaSeleccionada = recetasMap[recetasSelect.value];
+    if (recetaSeleccionada) {
+      idRecetaInput.value = recetaSeleccionada.idReceta;
+      precioInput.value = recetaSeleccionada.precio;
+    } else {
+      idRecetaInput.value = '';
+      precioInput.value = '';
+    }
+  });
 
-async function cargarOrdenesMesa() {
-  if (!mesaActual) return;
-  try {
-    const res = await fetch(`https://backend-mesas.onrender.com/ordenes/mesa/${mesaActual}`);
-    const ordenes = await res.json();
+  // Enviar orden a la base de datos
+  enviarBtn.addEventListener('click', () => {
+    const idReceta = parseInt(idRecetaInput.value);
+    const cantidad = parseInt(cantidadInput.value);
+    const fechaHora = new Date().toISOString().slice(0, 19).replace('T', ' '); // formato: YYYY-MM-DD HH:MM:SS
 
-    ordenesList.innerHTML = '';
-
-    if (ordenes.length === 0) {
-      ordenesList.textContent = 'No hay órdenes para esta mesa.';
+    if (!idReceta || !cantidad) {
+      alert('Completa todos los campos antes de enviar.');
       return;
     }
 
-    ordenes.forEach(orden => {
-      const div = document.createElement('div');
-      div.textContent = `${orden.nombre_receta} — Q${orden.precio_receta.toFixed(2)} — Cantidad: ${orden.cantidad} — Fecha: ${new Date(orden.fecha_hora).toLocaleString()}`;
-      ordenesList.appendChild(div);
-    });
-  } catch (error) {
-    ordenesList.textContent = 'Error al cargar órdenes.';
-    console.error(error);
+    const orden = {
+      noMesa: mesaActual,
+      idReceta: idReceta,
+      cantidad: cantidad,
+      fechaHora: fechaHora
+    };
+
+    fetch('https://backend-mesas.onrender.com/ordenes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(orden)
+    })
+      .then(res => res.text())
+      .then(msg => {
+        alert('Orden enviada');
+        cantidadInput.value = '';
+        recetasSelect.value = '';
+        idRecetaInput.value = '';
+        precioInput.value = '';
+        cargarOrdenes(); // refrescar tabla
+      })
+      .catch(err => console.error('Error al enviar orden:', err));
+  });
+
+  // Cargar órdenes por mesa
+  function cargarOrdenes() {
+    ordenesBody.innerHTML = '';
+    fetch(`https://backend-mesas.onrender.com/ordenes?mesa=${mesaActual}`)
+      .then(response => response.json())
+      .then(data => {
+        data.forEach(orden => {
+          const fila = document.createElement('tr');
+          fila.innerHTML = `
+            <td>${orden.idOrden}</td>
+            <td>${orden.idReceta}</td>
+            <td>${orden.nombreReceta}</td>
+            <td>${orden.precio.toFixed(2)}</td>
+            <td>${orden.cantidad}</td>
+            <td>${orden.fechaHora.replace('T', ' ').slice(0, 19)}</td>
+          `;
+          ordenesBody.appendChild(fila);
+        });
+      });
   }
-}
 
-entrarMesaBtn.addEventListener('click', () => {
-  const selectedMesa = mesaSelect.value;
-  if (!selectedMesa) {
-    alert('Por favor selecciona una mesa');
-    return;
-  }
-  mesaActual = parseInt(selectedMesa);
-  mesaSeleccionadaSpan.textContent = mesaActual;
-
-  mesaSection.style.display = 'none';
-  ordenesSection.style.display = 'block';
-
-  cargarOrdenesMesa();
+  // Inicial
+  cargarOrdenes();
 });
-
-volverMesaBtn.addEventListener('click', () => {
-  mesaActual = null;
-  mesaSeleccionadaSpan.textContent = '';
-  ordenesSection.style.display = 'none';
-  mesaSection.style.display = 'block';
-});
-
-window.onload = () => {
-  cargarMesas();
-  cargarRecetas();
-};
-
-function entrarMesa(num) {
-  mesaActual = num;
-  mesaSeleccionadaSpan.textContent = mesaActual;
-  mesaSection.style.display = 'none';
-  ordenesSection.style.display = 'block';
-  cargarOrdenesMesa();
-}
-
-async function cargarRecetas() {
-  try {
-    const res = await fetch('https://backend-mesas.onrender.com/recetas');
-    const recetas = await res.json();
-
-    recetaSelect.innerHTML = '';
-    recetas.forEach(r => {
-      const option = document.createElement('option');
-      option.value = r.id_receta;
-      option.textContent = `${r.nombre_receta} - Q${parseFloat(r.precio).toFixed(2)}`;
-      recetaSelect.appendChild(option);
-    });
-  } catch (err) {
-    alert('Error al cargar recetas');
-    console.error(err);
-  }
-}
