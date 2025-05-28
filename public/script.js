@@ -19,16 +19,22 @@ document.addEventListener('DOMContentLoaded', () => {
     .then(res => res.json())
     .then(mesas => {
       mesas.forEach(mesa => {
-        const btn = document.createElement('button');
-        btn.textContent = `Mesa ${mesa.noMesa}`;
-        btn.classList.add('btn-mesa');
-        btn.addEventListener('click', () => {
-          mesaActual = mesa.noMesa;
-          cargarOrdenes();
-          document.getElementById('mesaSeleccionada').textContent = `Mesa ${mesa.noMesa}`;
-        });
-        mesasContainer.appendChild(btn);
-      });
+  const btn = document.createElement('button');
+  btn.textContent = `Mesa ${mesa.noMesa}`;
+  btn.classList.add('btn-mesa');
+  btn.addEventListener('click', () => {
+    mesaActual = mesa.noMesa;
+    mesaSeleccionadaTexto.textContent = `Mesa seleccionada: ${mesa.noMesa}`;
+    cargarOrdenes();
+
+    // Quitar clase 'activa' a todos los botones
+    document.querySelectorAll('.btn-mesa').forEach(b => b.classList.remove('activa'));
+    // Agregar clase 'activa' al botón seleccionado
+    btn.classList.add('activa');
+  });
+  mesasContainer.appendChild(btn);
+});
+
     });
 
   // Tu código actual...

@@ -2,7 +2,8 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Gestión de Mesas</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Gestión de Mesas y Órdenes</title>
   <style>
     body { font-family: Arial, sans-serif; margin: 20px; }
     h1 { margin-bottom: 20px; }
@@ -30,10 +31,12 @@
 </head>
 <body>
 
-  <h2>Gestión de Órdenes por Mesa</h2>
+  <h1>Gestión de Mesas y Órdenes</h1>
 
-  <label for="mesa">Número de mesa:</label>
-  <input type="number" id="mesa" value="1" min="1">
+  <ul id="listaMesas"></ul>
+
+  <section id="ordenesSection">
+    <h2>Órdenes de la Mesa <span id="mesaSeleccionada"></span></h2>
 
   <h3>Agregar orden</h3>
 
@@ -68,6 +71,50 @@
   <button onclick="enviarOrden()">Enviar orden a cocina</button>
 
   <script>
+  const API_URL = 'https://backend-mesas.onrender.com/ordenes';
+  const MESAS_URL = 'https://backend-mesas.onrender.com/mesas';
+  const RECETAS_URL = 'https://backend-mesas.onrender.com/recetas';
+
+  const listaMesas = document.getElementById('listaMesas');
+  const ordenesSection = document.getElementById('ordenesSection');
+  const mesaSeleccionadaSpan = document.getElementById('mesaSeleccionada');
+
+  let mesaActual = null;
+
+  async function cargarMesas() {
+    try {
+      const res = await fetch(MESAS_URL);
+      const mesas = await res.json();
+
+      listaMesas.innerHTML = '';
+      mesas.forEach(mesa => {
+        const numeroMesa = mesa.numero ?? mesa;
+        const li = document.createElement('li');
+        li.textContent = `Mesa ${numeroMesa}`;
+        li.dataset.numero = numeroMesa;
+        li.addEventListener('click', () => seleccionarMesa(numeroMesa));
+        listaMesas.appendChild(li);
+      });
+    } catch (error) {
+      alert('Error al cargar mesas');
+      console.error(error);
+    }
+  }
+
+  function seleccionarMesa(numero) {
+    mesaActual = numero;
+    mesaSeleccionadaSpan.textContent = numero;
+    ordenesSection.style.display = 'block';
+    listaMesas.style.display = 'none';
+
+    document.querySelectorAll('#listaMesas li').forEach(li => {
+      li.classList.toggle('selected', li.dataset.numero == numero);
+    });
+  }
+
+  
+
+  document.addEventListener('DOMContentLoaded', cargarMesas);
     let recetas = {};
     let ordenesPendientes = [];
 
@@ -99,27 +146,35 @@
 
     // Agrega una orden localmente
     function agregarOrden() {
-      const noMesa = parseInt(document.getElementById('mesa').value);
-      const nombre = document.getElementById('nombreReceta').value;
-      const receta = recetas[nombre];
-      const cantidad = parseInt(document.getElementById('cantidad').value);
-      const fechaHora = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  if (!mesaActual) {
+    alert('Primero selecciona una mesa');
+    return;
+  }
 
-      if (!receta || cantidad <= 0) return alert('Verifica los datos');
+  const nombre = document.getElementById('nombreReceta').value;
+  const receta = recetas[nombre];
+  const cantidad = parseInt(document.getElementById('cantidad').value);
+  const fechaHora = new Date().toISOString().slice(0, 19).replace('T', ' ');
 
-      const orden = {
-        id_orden: '-', // aún no se ha insertado
-        id_receta: receta.id_receta,
-        nombre_receta: receta.nombre_receta,
-        precio: receta.precio,
-        cantidad,
-        fecha_hora: fechaHora,
-        no_mesa: noMesa
-      };
+  if (!receta || cantidad <= 0) {
+    alert('Verifica los datos');
+    return;
+  }
 
-      ordenesPendientes.push(orden);
-      renderizarTabla();
-    }
+  const orden = {
+    id_orden: '-', // aún no se ha insertado
+    id_receta: receta.id_receta,
+    nombre_receta: receta.nombre_receta,
+    precio: receta.precio,
+    cantidad,
+    fecha_hora: fechaHora,
+    no_mesa: mesaActual
+  };
+
+  ordenesPendientes.push(orden);
+  renderizarTabla();
+}
+
 
     // Muestra las órdenes pendientes en la tabla
     function renderizarTabla() {
@@ -141,22 +196,29 @@
 
     // Enviar órdenes a la base de datos
     async function enviarOrden() {
-      for (const orden of ordenesPendientes) {
-        await fetch('https://backend-mesas.onrender.com/ordenes', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            no_mesa: orden.no_mesa,
-            id_receta: orden.id_receta,
-            cantidad: orden.cantidad,
-            fecha_hora: orden.fecha_hora
-          })
-        });
-      }
-      alert('Orden enviada a cocina');
-      ordenesPendientes = [];
-      renderizarTabla();
-    }
+  if (!mesaActual || ordenesPendientes.length === 0) {
+    alert('Selecciona una mesa y agrega al menos una orden');
+    return;
+  }
+
+  for (const orden of ordenesPendientes) {
+    await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        no_mesa: orden.no_mesa,
+        id_receta: orden.id_receta,
+        cantidad: orden.cantidad,
+        fecha_hora: orden.fecha_hora
+      })
+    });
+  }
+
+  alert('Orden enviada a cocina');
+  ordenesPendientes = [];
+  renderizarTabla();
+}
+
 
     cargarRecetas();
   </script>
