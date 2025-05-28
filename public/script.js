@@ -1,89 +1,68 @@
-const mesaSelect = document.getElementById('mesaSelect');
-const entrarMesaBtn = document.getElementById('entrarMesa');
-const mesaSection = document.getElementById('mesaSection');
-const ordenesSection = document.getElementById('ordenesSection');
-const mesaSeleccionadaSpan = document.getElementById('mesaSeleccionada');
-const volverMesaBtn = document.getElementById('volverMesa');
-const ordenesList = document.getElementById('ordenesList');
+const API_URL = 'http://localhost:3000/ordenes';
+const API_RECETAS = 'http://localhost:3000/recetas';
 
-let mesaActual = null;
+const mesaActual = 1;
+const idOrdenEditar = null;
 
-async function cargarMesas() {
+const recetaSelect = document.getElementById('id_receta');
+const cantidadInput = document.getElementById('cantidad');
+const formOrden = document.getElementById('formOrden');
+
+async function cargarRecetas() {
   try {
-    const res = await fetch('/mesas');
-    const mesas = await res.json();
+    const res = await fetch(API_RECETAS);
+    if (!res.ok) throw new Error('Error al cargar recetas');
+    const recetas = await res.json();
 
-    mesaSelect.innerHTML = '<option value="" disabled selected>Selecciona una mesa</option>';
-    mesas.forEach(mesa => {
+    recetaSelect.innerHTML = '<option value="" disabled selected>Selecciona un producto</option>';
+    recetas.forEach(r => {
       const option = document.createElement('option');
-      option.value = mesa;
-      option.textContent = mesa;
-      mesaSelect.appendChild(option);
+      option.value = r.id_receta;
+      option.textContent = `${r.nombre_receta} - Q${parseFloat(r.precio).toFixed(2)}`;
+      recetaSelect.appendChild(option);
     });
-
-    entrarMesaBtn.disabled = false;
   } catch (error) {
-    mesaSelect.innerHTML = '<option value="" disabled>Error cargando mesas</option>';
+    alert('No se pudieron cargar los productos');
     console.error(error);
   }
 }
 
-async function cargarOrdenesMesa() {
-  if (!mesaActual) return;
-  try {
-    const res = await fetch(`/ordenes/mesa/${mesaActual}`);
-    const ordenes = await res.json();
+formOrden.addEventListener('submit', async (e) => {
+  e.preventDefault();
 
-    ordenesList.innerHTML = '';
+  const id_receta = parseInt(recetaSelect.value);
+  const cantidad = parseInt(cantidadInput.value);
 
-    if (ordenes.length === 0) {
-      ordenesList.textContent = 'No hay órdenes para esta mesa.';
-      return;
-    }
-
-    ordenes.forEach(orden => {
-      const div = document.createElement('div');
-      div.textContent = `${orden.producto} — Cantidad: ${orden.cantidad} — Fecha: ${new Date(orden.fecha).toLocaleString()}`;
-      ordenesList.appendChild(div);
-    });
-  } catch (error) {
-    ordenesList.textContent = 'Error al cargar órdenes.';
-    console.error(error);
-  }
-}
-
-entrarMesaBtn.addEventListener('click', () => {
-  const selectedMesa = mesaSelect.value;
-  if (!selectedMesa) {
-    alert('Por favor selecciona una mesa');
+  if (!id_receta || cantidad < 1) {
+    alert('Por favor, selecciona un producto y una cantidad válida.');
     return;
   }
-  mesaActual = parseInt(selectedMesa);
-  mesaSeleccionadaSpan.textContent = mesaActual;
 
-  mesaSection.style.display = 'none';
-  ordenesSection.style.display = 'block';
+  const dataOrden = {
+    no_mesa: mesaActual,
+    id_receta,
+    cantidad
+  };
 
-  cargarOrdenesMesa();
-});
+  try {
+    const url = idOrdenEditar ? `${API_URL}/${idOrdenEditar}` : API_URL;
+    const method = idOrdenEditar ? 'PUT' : 'POST';
 
-volverMesaBtn.addEventListener('click', () => {
-  mesaActual = null;
-  mesaSeleccionadaSpan.textContent = '';
-  ordenesSection.style.display = 'none';
-  mesaSection.style.display = 'block';
-});
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(dataOrden)
+    });
 
-window.onload = cargarMesas;
+    if (!res.ok) throw new Error('Error al guardar la orden');
 
-function entrarMesa(num) {
-    mesaActual = num;
-    mesaSeleccionadaSpan.textContent = mesaActual;
-    mesaSection.style.display = 'none';
-    ordenesSection.style.display = 'block';
-    cargarOrdenesMesa();
+    alert('Orden guardada con éxito');
+    formOrden.reset();
+
+  } catch (error) {
+    alert('Hubo un problema guardando la orden');
+    console.error(error);
   }
-  
-  app.get('/', (req, res) => {
-  res.send('API funcionando correctamente');
 });
+
+cargarRecetas();
