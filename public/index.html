@@ -1,277 +1,162 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Gestión de Mesas y Órdenes</title>
+  <meta charset="UTF-8">
+  <title>Gestión de Mesas</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    h1 { margin-bottom: 20px; }
-    #listaMesas { display: flex; flex-wrap: wrap; gap: 10px; padding-left: 0; margin-bottom: 20px; }
-    #listaMesas li {
-      background-color: #007bff;
-      color: white;
-      padding: 10px 16px;
-      border-radius: 5px;
-      cursor: pointer;
-      list-style: none;
-      transition: background-color 0.2s ease;
-      user-select: none;
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
     }
-    #listaMesas li:hover { background-color: #0056b3; }
-    #listaMesas li.selected { background-color: #28a745; }
-    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
-    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-    th { background-color: #f4f4f4; }
-    input[type="text"], input[type="number"], select { padding: 5px; width: 150px; }
-    button { padding: 6px 12px; margin: 2px; cursor: pointer; }
-    form > div { margin-bottom: 10px; }
-    #ordenesSection { display: none; }
+    input, select, button {
+      margin: 5px;
+      padding: 5px;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 15px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+    }
+    th {
+      background-color: #f2f2f2;
+    }
   </style>
 </head>
 <body>
 
-  <h1>Gestión de Mesas y Órdenes</h1>
+  <h2>Gestión de Órdenes por Mesa</h2>
 
-  <ul id="listaMesas"></ul>
+  <label for="mesa">Número de mesa:</label>
+  <input type="number" id="mesa" value="1" min="1">
 
-  <section id="ordenesSection">
-    <h2>Órdenes de la Mesa <span id="mesaSeleccionada"></span></h2>
+  <h3>Agregar orden</h3>
 
-    <form id="ordenForm">
-      <input type="hidden" id="ordenId" />
-      <div>
-        <label for="id_receta">Producto:</label>
-        <select id="id_receta" name="id_receta" required></select>
-      </div>
+  <label for="nombreReceta">Nombre de receta:</label>
+  <select id="nombreReceta"></select>
 
-      <div>
-        <label for="cantidad">Cantidad:</label>
-        <input type="number" id="cantidad" name="cantidad" min="1" required />
-      </div>
-      <button type="submit">Guardar Orden</button>
-      <button type="button" id="cancelEdit" style="display:none;">Cancelar</button>
-    </form>
+  <label for="idReceta">ID Receta:</label>
+  <input type="text" id="idReceta" readonly>
 
-    <table id="ordenesTable">
-      <thead>
-        <tr>
-          <th>ID Orden</th>
-          <th>ID Receta</th>
-          <th>Nombre Receta</th>
-          <th>Precio</th>
-          <th>Cantidad</th>
-          <th>Fecha y Hora</th>
-          <th>Acciones</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
+  <label for="precio">Precio:</label>
+  <input type="text" id="precio" readonly>
 
-    <button id="volverMesa">Volver a selección de mesa</button>
-  </section>
+  <label for="cantidad">Cantidad:</label>
+  <input type="number" id="cantidad" min="1" value="1">
+
+  <button onclick="agregarOrden()">Agregar a orden</button>
+
+  <table>
+    <thead>
+      <tr>
+        <th>ID Orden</th>
+        <th>ID Receta</th>
+        <th>Nombre Receta</th>
+        <th>Precio</th>
+        <th>Cantidad</th>
+        <th>Fecha y Hora</th>
+      </tr>
+    </thead>
+    <tbody id="tablaOrdenes"></tbody>
+  </table>
+
+  <button onclick="enviarOrden()">Enviar orden a cocina</button>
 
   <script>
-    const API_URL = 'https://backend-mesas.onrender.com/ordenes';
-    const MESAS_URL = 'https://backend-mesas.onrender.com/mesas';
-    const RECETAS_URL = 'https://backend-mesas.onrender.com/recetas';
+    let recetas = {};
+    let ordenesPendientes = [];
 
-    const listaMesas = document.getElementById('listaMesas');
-    const ordenesSection = document.getElementById('ordenesSection');
-    const mesaSeleccionadaSpan = document.getElementById('mesaSeleccionada');
-
-    const ordenForm = document.getElementById('ordenForm');
-    const ordenIdInput = document.getElementById('ordenId');
-    const productoInput = document.getElementById('id_receta');
-    const cantidadInput = document.getElementById('cantidad');
-    const cancelEditBtn = document.getElementById('cancelEdit');
-    const ordenesTableBody = document.querySelector('#ordenesTable tbody');
-
-    let mesaActual = null;
-
-    function escapeHtml(text) {
-      return text.replace(/&/g, "&amp;").replace(/</g, "&lt;")
-                 .replace(/>/g, "&gt;").replace(/"/g, "&quot;")
-                 .replace(/'/g, "&#039;");
-    }
-
-    async function cargarMesas() {
-      try {
-        const res = await fetch(MESAS_URL);
-        const mesas = await res.json();
-
-        listaMesas.innerHTML = '';
-        mesas.forEach(mesa => {
-          const numeroMesa = mesa.numero ?? mesa;
-          const li = document.createElement('li');
-          li.textContent = `Mesa ${numeroMesa}`;
-          li.dataset.numero = numeroMesa;
-          li.addEventListener('click', () => seleccionarMesa(numeroMesa));
-          listaMesas.appendChild(li);
-        });
-      } catch (error) {
-        alert('Error al cargar mesas');
-        console.error(error);
-      }
-    }
-
+    // Cargar recetas desde la API
     async function cargarRecetas() {
-      try {
-        const res = await fetch(RECETAS_URL);
-        const recetas = await res.json();
-        productoInput.innerHTML = '';
-
-        if (recetas.length === 0) {
-          productoInput.innerHTML = '<option disabled selected>No hay recetas</option>';
-          return;
-        }
-
-        recetas.forEach(r => {
-          const option = document.createElement('option');
-          option.value = r.id_receta;
-          option.textContent = `${r.nombre_receta} - Q${parseFloat(r.precio).toFixed(2)}`;
-          productoInput.appendChild(option);
-        });
-      } catch (error) {
-        alert('Error al cargar recetas');
-        console.error(error);
-      }
-    }
-
-    function seleccionarMesa(numero) {
-      mesaActual = numero;
-      mesaSeleccionadaSpan.textContent = numero;
-      ordenesSection.style.display = 'block';
-      listaMesas.style.display = 'none';
-
-      document.querySelectorAll('#listaMesas li').forEach(li => {
-        li.classList.toggle('selected', li.dataset.numero == numero);
+      const response = await fetch('https://backend-mesas.onrender.com/recetas');
+      const data = await response.json();
+      const select = document.getElementById('nombreReceta');
+      data.forEach(receta => {
+        recetas[receta.nombre_receta] = receta;
+        const option = document.createElement('option');
+        option.value = receta.nombre_receta;
+        option.textContent = receta.nombre_receta;
+        select.appendChild(option);
       });
-
-      cargarOrdenesMesa();
+      actualizarCampos();
     }
 
-    document.getElementById('volverMesa').addEventListener('click', () => {
-      mesaActual = null;
-      ordenForm.reset();
-      ordenIdInput.value = '';
-      cancelEditBtn.style.display = 'none';
-      ordenesTableBody.innerHTML = '';
-      ordenesSection.style.display = 'none';
-      listaMesas.style.display = 'flex';
-
-      document.querySelectorAll('#listaMesas li').forEach(li => li.classList.remove('selected'));
-    });
-
-    async function cargarOrdenesMesa() {
-      if (!mesaActual) return;
-
-      try {
-        const res = await fetch(`${API_URL}/mesa/${mesaActual}`);
-        const ordenes = await res.json();
-        ordenesTableBody.innerHTML = '';
-
-        if (!ordenes.length) {
-          ordenesTableBody.innerHTML = `<tr><td colspan="7">No hay órdenes para esta mesa.</td></tr>`;
-          return;
-        }
-
-        ordenes.forEach(o => {
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td>${o.id_orden}</td>
-            <td>${o.id_receta}</td>
-            <td>${escapeHtml(o.nombre_receta)}</td>
-            <td>Q${parseFloat(o.precio_receta).toFixed(2)}</td>
-            <td>${o.cantidad}</td>
-            <td>${new Date(o.fecha_hora).toLocaleString()}</td>
-            <td>
-              <button onclick="editarOrden(${o.id_orden}, ${o.id_receta}, ${o.cantidad})">Editar</button>
-              <button onclick="eliminarOrden(${o.id_orden})">Eliminar</button>
-            </td>
-          `;
-          ordenesTableBody.appendChild(tr);
-        });
-
-      } catch (error) {
-        alert('Error al cargar órdenes');
-        console.error(error);
+    // Actualiza los campos de ID y precio al seleccionar receta
+    function actualizarCampos() {
+      const nombre = document.getElementById('nombreReceta').value;
+      if (recetas[nombre]) {
+        document.getElementById('idReceta').value = recetas[nombre].id_receta;
+        document.getElementById('precio').value = recetas[nombre].precio;
       }
     }
 
-    ordenForm.addEventListener('submit', async e => {
-      e.preventDefault();
+    document.getElementById('nombreReceta').addEventListener('change', actualizarCampos);
 
-      const id = ordenIdInput.value;
-      const id_receta = productoInput.value;
-      const cantidad = parseInt(cantidadInput.value);
+    // Agrega una orden localmente
+    function agregarOrden() {
+      const noMesa = parseInt(document.getElementById('mesa').value);
+      const nombre = document.getElementById('nombreReceta').value;
+      const receta = recetas[nombre];
+      const cantidad = parseInt(document.getElementById('cantidad').value);
+      const fechaHora = new Date().toISOString().slice(0, 19).replace('T', ' ');
 
-      if (!id_receta || !cantidad || cantidad < 1) {
-        alert('Por favor completa correctamente los campos.');
-        return;
-      }
+      if (!receta || cantidad <= 0) return alert('Verifica los datos');
 
-      if (!mesaActual) {
-        alert('No hay mesa seleccionada.');
-        return;
-      }
+      const orden = {
+        id_orden: '-', // aún no se ha insertado
+        id_receta: receta.id_receta,
+        nombre_receta: receta.nombre_receta,
+        precio: receta.precio,
+        cantidad,
+        fecha_hora: fechaHora,
+        no_mesa: noMesa
+      };
 
-      const ordenData = { mesa: mesaActual, id_receta, cantidad };
+      ordenesPendientes.push(orden);
+      renderizarTabla();
+    }
 
-      try {
-        const res = await fetch(`${API_URL}${id ? '/' + id : ''}`, {
-          method: id ? 'PUT' : 'POST',
+    // Muestra las órdenes pendientes en la tabla
+    function renderizarTabla() {
+      const tbody = document.getElementById('tablaOrdenes');
+      tbody.innerHTML = '';
+      ordenesPendientes.forEach((orden, i) => {
+        const row = `
+          <tr>
+            <td>${orden.id_orden}</td>
+            <td>${orden.id_receta}</td>
+            <td>${orden.nombre_receta}</td>
+            <td>${orden.precio}</td>
+            <td>${orden.cantidad}</td>
+            <td>${orden.fecha_hora}</td>
+          </tr>`;
+        tbody.innerHTML += row;
+      });
+    }
+
+    // Enviar órdenes a la base de datos
+    async function enviarOrden() {
+      for (const orden of ordenesPendientes) {
+        await fetch('https://backend-mesas.onrender.com/ordenes', {
+          method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(ordenData)
+          body: JSON.stringify({
+            no_mesa: orden.no_mesa,
+            id_receta: orden.id_receta,
+            cantidad: orden.cantidad,
+            fecha_hora: orden.fecha_hora
+          })
         });
-
-        if (!res.ok) throw new Error('Fallo al guardar');
-
-        ordenForm.reset();
-        ordenIdInput.value = '';
-        cancelEditBtn.style.display = 'none';
-        cargarOrdenesMesa();
-      } catch (error) {
-        alert('Error al guardar la orden.');
-        console.error(error);
       }
-    });
-
-    cancelEditBtn.addEventListener('click', () => {
-      ordenForm.reset();
-      ordenIdInput.value = '';
-      cancelEditBtn.style.display = 'none';
-    });
-
-    function editarOrden(id, id_receta, cantidad) {
-      ordenIdInput.value = id;
-      productoInput.value = id_receta;
-      cantidadInput.value = cantidad;
-      cancelEditBtn.style.display = 'inline-block';
+      alert('Orden enviada a cocina');
+      ordenesPendientes = [];
+      renderizarTabla();
     }
 
-    async function eliminarOrden(id) {
-      if (!confirm('¿Deseas eliminar esta orden?')) return;
-
-      try {
-        const res = await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
-        if (!res.ok) throw new Error('Error al eliminar');
-        cargarOrdenesMesa();
-      } catch (error) {
-        alert('Error al eliminar la orden.');
-        console.error(error);
-      }
-    }
-
-    window.editarOrden = editarOrden;
-    window.eliminarOrden = eliminarOrden;
-
-    // Cargar mesas y recetas al inicio
-    window.addEventListener('DOMContentLoaded', () => {
-      cargarMesas();
-      cargarRecetas();
-    });
+    cargarRecetas();
   </script>
-
 </body>
 </html>
