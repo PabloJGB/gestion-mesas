@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Gestión de Mesas y Órdenes</title>
   <style>
-    /* --- Estilos Básicos --- */
     body { font-family: Arial, sans-serif; margin: 20px; }
     h1 { margin-bottom: 20px; }
     #listaMesas { display: flex; flex-wrap: wrap; gap: 10px; padding-left: 0; margin-bottom: 20px; }
@@ -24,7 +23,7 @@
     table { border-collapse: collapse; width: 100%; margin-top: 20px; }
     th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
     th { background-color: #f4f4f4; }
-    input[type="text"], input[type="number"] { padding: 5px; width: 150px; }
+    input[type="text"], input[type="number"], select { padding: 5px; width: 150px; }
     button { padding: 6px 12px; margin: 2px; cursor: pointer; }
     form > div { margin-bottom: 10px; }
     #ordenesSection { display: none; }
@@ -39,19 +38,20 @@
   <section id="ordenesSection">
     <h2>Órdenes de la Mesa <span id="mesaSeleccionada"></span></h2>
 
-    <form id="orden-form">
-      <input type="hidden" id="orden-id" />
-      
-      <label for="id_receta">Producto:</label>
-      <select id="id_receta" name="id_receta" required></select>
+    <form id="ordenForm">
+      <input type="hidden" id="ordenId" />
+      <div>
+        <label for="id_receta">Producto:</label>
+        <select id="id_receta" name="id_receta" required></select>
+      </div>
 
-      <label for="cantidad">Cantidad:</label>
-      <input type="number" id="cantidad" name="cantidad" min="1" required />
-
-      <button type="submit">Guardar</button>
-      <button type="button" id="cancel-edit" style="display:none;">Cancelar</button>
+      <div>
+        <label for="cantidad">Cantidad:</label>
+        <input type="number" id="cantidad" name="cantidad" min="1" required />
+      </div>
+      <button type="submit">Guardar Orden</button>
+      <button type="button" id="cancelEdit" style="display:none;">Cancelar</button>
     </form>
-
 
     <table id="ordenesTable">
       <thead>
@@ -82,7 +82,7 @@
 
     const ordenForm = document.getElementById('ordenForm');
     const ordenIdInput = document.getElementById('ordenId');
-    const recetaSelect = document.getElementById('id_receta');
+    const productoInput = document.getElementById('id_receta');
     const cantidadInput = document.getElementById('cantidad');
     const cancelEditBtn = document.getElementById('cancelEdit');
     const ordenesTableBody = document.querySelector('#ordenesTable tbody');
@@ -93,10 +93,6 @@
       return text.replace(/&/g, "&amp;").replace(/</g, "&lt;")
                  .replace(/>/g, "&gt;").replace(/"/g, "&quot;")
                  .replace(/'/g, "&#039;");
-    }
-
-    function escapeJs(text) {
-      return text.replace(/'/g, "\\'").replace(/"/g, '\\"');
     }
 
     async function cargarMesas() {
@@ -123,17 +119,22 @@
       try {
         const res = await fetch(RECETAS_URL);
         const recetas = await res.json();
+        productoInput.innerHTML = '';
 
-        recetaSelect.innerHTML = '';
+        if (recetas.length === 0) {
+          productoInput.innerHTML = '<option disabled selected>No hay recetas</option>';
+          return;
+        }
+
         recetas.forEach(r => {
           const option = document.createElement('option');
           option.value = r.id_receta;
           option.textContent = `${r.nombre_receta} - Q${parseFloat(r.precio).toFixed(2)}`;
-          recetaSelect.appendChild(option);
+          productoInput.appendChild(option);
         });
-      } catch (err) {
+      } catch (error) {
         alert('Error al cargar recetas');
-        console.error(err);
+        console.error(error);
       }
     }
 
@@ -202,7 +203,7 @@
       e.preventDefault();
 
       const id = ordenIdInput.value;
-      const id_receta = recetaSelect.value;
+      const id_receta = productoInput.value;
       const cantidad = parseInt(cantidadInput.value);
 
       if (!id_receta || !cantidad || cantidad < 1) {
@@ -244,21 +245,17 @@
 
     function editarOrden(id, id_receta, cantidad) {
       ordenIdInput.value = id;
-      recetaSelect.value = id_receta;
+      productoInput.value = id_receta;
       cantidadInput.value = cantidad;
       cancelEditBtn.style.display = 'inline-block';
     }
 
     async function eliminarOrden(id) {
-      if (!confirm('¿Eliminar esta orden?')) return;
+      if (!confirm('¿Deseas eliminar esta orden?')) return;
 
       try {
-        const res = await fetch(`${API_URL}/${id}`, {
-          method: 'DELETE'
-        });
-
-        if (!res.ok) throw new Error('Fallo al eliminar');
-
+        const res = await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('Error al eliminar');
         cargarOrdenesMesa();
       } catch (error) {
         alert('Error al eliminar la orden.');
@@ -266,11 +263,15 @@
       }
     }
 
+    window.editarOrden = editarOrden;
+    window.eliminarOrden = eliminarOrden;
+
     // Cargar mesas y recetas al inicio
     window.addEventListener('DOMContentLoaded', () => {
       cargarMesas();
       cargarRecetas();
     });
   </script>
+
 </body>
 </html>
