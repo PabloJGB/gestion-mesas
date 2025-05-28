@@ -29,17 +29,27 @@ app.get('/ordenes', async (req, res) => {
   }
 });
 
-// Obtener órdenes por número de mesa
-app.get('/ordenes/mesa/:numero', async (req, res) => {
-  const no_mesa = parseInt(req.params.numero);
-  if (!no_mesa) return res.status(400).json({ error: 'Número de mesa inválido' });
+// Obtener órdenes por número de mesa (con detalles de receta)
+app.get('/ordenes/mesa/:mesaNumero', async (req, res) => {
+  const mesa = parseInt(req.params.mesaNumero);
+  console.log('Mesa recibida:', mesa);
 
   try {
-    const result = await pool.query(
-      'SELECT * FROM ordenes WHERE no_mesa = $1 ORDER BY fecha_hora DESC',
-      [no_mesa]
-    );
-    res.json(result.rows);
+    const resultado = await pool.query(`
+      SELECT 
+        o.id_orden,
+        o.id_receta,
+        r.nombre_receta,
+        r.precio AS precio_receta,
+        o.cantidad,
+        o.fecha_hora
+      FROM ordenes o
+      JOIN recetas r ON o.id_receta = r.id_receta
+      WHERE o.no_mesa = $1
+      ORDER BY o.fecha_hora DESC
+    `, [mesa]);
+
+    res.json(resultado.rows);
   } catch (error) {
     console.error('Error al obtener órdenes por mesa:', error);
     res.status(500).json({ error: 'Error al obtener órdenes por mesa' });
@@ -101,38 +111,7 @@ app.get('/mesas', async (req, res) => {
   }
 });
 
-app.get('/ordenes/mesa/:mesaNumero', async (req, res) => {
-  const mesa = parseInt(req.params.mesaNumero);
-  console.log('Mesa recibida:', mesa); // 👈 Asegúrate de ver esto
-
-  try {
-    const resultado = await pool.query(
-      SELECT 
-        o.id_orden,
-        o.id_receta,
-        r.nombre_receta,
-        r.precio AS precio_receta,
-        o.cantidad,
-        o.fecha_hora
-      FROM ordenes o
-      JOIN recetas r ON o.id_receta = r.id_receta
-      WHERE o.no_mesa = $1;
-    , [mesa]);
-
-    res.json(resultado.rows);
-  } catch (error) {
-    console.error('Error al obtener órdenes:', error);
-    res.status(500).json({ error: 'Error al obtener órdenes por mesa' });
-  }
-});
-
-
-// Iniciar servidor
-app.listen(port, () => {
-  console.log(✅ Backend corriendo en http://localhost:${port});
-});
-
-// Backend: obtener recetas
+// Obtener recetas
 app.get('/recetas', async (req, res) => {
   try {
     const result = await pool.query('SELECT id_receta, nombre_receta, precio FROM recetas ORDER BY nombre_receta');
@@ -143,17 +122,7 @@ app.get('/recetas', async (req, res) => {
   }
 });
 
-const id_receta = parseInt(recetaSelect.value);
-const cantidad = parseInt(cantidadInput.value);
-
-const ordenData = {
-  no_mesa: mesaActual,
-  id_receta,
-  cantidad
-};
-
-const res = await fetch(`${API_URL}${id ? '/' + id : ''}`, {
-  method: id ? 'PUT' : 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify(ordenData)
+// Iniciar servidor
+app.listen(port, () => {
+  console.log(`✅ Backend corriendo en http://localhost:${port}`);
 });

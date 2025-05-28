@@ -5,12 +5,13 @@ const ordenesSection = document.getElementById('ordenesSection');
 const mesaSeleccionadaSpan = document.getElementById('mesaSeleccionada');
 const volverMesaBtn = document.getElementById('volverMesa');
 const ordenesList = document.getElementById('ordenesList');
+const recetaSelect = document.getElementById('id_receta');
 
 let mesaActual = null;
 
 async function cargarMesas() {
   try {
-    const res = await fetch('/mesas');
+    const res = await fetch('https://backend-mesas.onrender.com/mesas');
     const mesas = await res.json();
 
     mesaSelect.innerHTML = '<option value="" disabled selected>Selecciona una mesa</option>';
@@ -31,7 +32,7 @@ async function cargarMesas() {
 async function cargarOrdenesMesa() {
   if (!mesaActual) return;
   try {
-    const res = await fetch(/ordenes/mesa/${mesaActual});
+    const res = await fetch(`https://backend-mesas.onrender.com/ordenes/mesa/${mesaActual}`);
     const ordenes = await res.json();
 
     ordenesList.innerHTML = '';
@@ -43,7 +44,7 @@ async function cargarOrdenesMesa() {
 
     ordenes.forEach(orden => {
       const div = document.createElement('div');
-      div.textContent = ${orden.producto} — Cantidad: ${orden.cantidad} — Fecha: ${new Date(orden.fecha).toLocaleString()};
+      div.textContent = `${orden.nombre_receta} — Q${orden.precio_receta.toFixed(2)} — Cantidad: ${orden.cantidad} — Fecha: ${new Date(orden.fecha_hora).toLocaleString()}`;
       ordenesList.appendChild(div);
     });
   } catch (error) {
@@ -74,21 +75,18 @@ volverMesaBtn.addEventListener('click', () => {
   mesaSection.style.display = 'block';
 });
 
-window.onload = cargarMesas;
+window.onload = () => {
+  cargarMesas();
+  cargarRecetas();
+};
 
 function entrarMesa(num) {
-    mesaActual = num;
-    mesaSeleccionadaSpan.textContent = mesaActual;
-    mesaSection.style.display = 'none';
-    ordenesSection.style.display = 'block';
-    cargarOrdenesMesa();
-  }
-  
-  app.get('/', (req, res) => {
-  res.send('API funcionando correctamente');
-});
-
-const recetaSelect = document.getElementById('id_receta');
+  mesaActual = num;
+  mesaSeleccionadaSpan.textContent = mesaActual;
+  mesaSection.style.display = 'none';
+  ordenesSection.style.display = 'block';
+  cargarOrdenesMesa();
+}
 
 async function cargarRecetas() {
   try {
