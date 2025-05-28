@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Gestión de Mesas y Órdenes</title>
   <style>
-    /* --- Estilos Básicos --- */
     body { font-family: Arial, sans-serif; margin: 20px; }
     h1 { margin-bottom: 20px; }
     #listaMesas { display: flex; flex-wrap: wrap; gap: 10px; padding-left: 0; margin-bottom: 20px; }
@@ -24,7 +23,7 @@
     table { border-collapse: collapse; width: 100%; margin-top: 20px; }
     th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
     th { background-color: #f4f4f4; }
-    input[type="text"], input[type="number"] { padding: 5px; width: 150px; }
+    input[type="text"], input[type="number"], select { padding: 5px; width: 150px; }
     button { padding: 6px 12px; margin: 2px; cursor: pointer; }
     form > div { margin-bottom: 10px; }
     #ordenesSection { display: none; }
@@ -75,6 +74,7 @@
   <script>
     const API_URL = 'https://backend-mesas.onrender.com/ordenes';
     const MESAS_URL = 'https://backend-mesas.onrender.com/mesas';
+    const RECETAS_URL = 'https://backend-mesas.onrender.com/recetas';
 
     const listaMesas = document.getElementById('listaMesas');
     const ordenesSection = document.getElementById('ordenesSection');
@@ -82,7 +82,7 @@
 
     const ordenForm = document.getElementById('ordenForm');
     const ordenIdInput = document.getElementById('ordenId');
-    const productoInput = document.getElementById('producto');
+    const productoInput = document.getElementById('id_receta');
     const cantidadInput = document.getElementById('cantidad');
     const cancelEditBtn = document.getElementById('cancelEdit');
     const ordenesTableBody = document.querySelector('#ordenesTable tbody');
@@ -119,6 +119,29 @@
       }
     }
 
+    async function cargarRecetas() {
+      try {
+        const res = await fetch(RECETAS_URL);
+        const recetas = await res.json();
+        productoInput.innerHTML = '';
+
+        if (recetas.length === 0) {
+          productoInput.innerHTML = '<option disabled selected>No hay recetas</option>';
+          return;
+        }
+
+        recetas.forEach(r => {
+          const option = document.createElement('option');
+          option.value = r.id_receta;
+          option.textContent = r.nombre;
+          productoInput.appendChild(option);
+        });
+      } catch (error) {
+        alert('Error al cargar recetas');
+        console.error(error);
+      }
+    }
+
     function seleccionarMesa(numero) {
       mesaActual = numero;
       mesaSeleccionadaSpan.textContent = numero;
@@ -140,7 +163,6 @@
       ordenesTableBody.innerHTML = '';
       ordenesSection.style.display = 'none';
       listaMesas.style.display = 'flex';
-
       document.querySelectorAll('#listaMesas li').forEach(li => li.classList.remove('selected'));
     });
 
@@ -167,7 +189,7 @@
             <td>${o.cantidad}</td>
             <td>${new Date(o.fecha_hora).toLocaleString()}</td>
             <td>
-              <button onclick="editarOrden(${o.id_orden}, '${escapeJs(o.nombre_receta)}', ${o.cantidad})">Editar</button>
+              <button onclick="editarOrden(${o.id_orden}, ${o.id_receta}, ${o.cantidad})">Editar</button>
               <button onclick="eliminarOrden(${o.id_orden})">Eliminar</button>
             </td>
           `;
@@ -184,10 +206,10 @@
       e.preventDefault();
 
       const id = ordenIdInput.value;
-      const producto = productoInput.value.trim();
+      const id_receta = productoInput.value;
       const cantidad = parseInt(cantidadInput.value);
 
-      if (!producto || !cantidad || cantidad < 1) {
+      if (!id_receta || !cantidad || cantidad < 1) {
         alert('Por favor completa correctamente los campos.');
         return;
       }
@@ -197,7 +219,7 @@
         return;
       }
 
-      const ordenData = { mesa: mesaActual, producto, cantidad };
+      const ordenData = { mesa: mesaActual, id_receta, cantidad };
 
       try {
         const res = await fetch(`${API_URL}${id ? '/' + id : ''}`, {
@@ -224,9 +246,9 @@
       cancelEditBtn.style.display = 'none';
     });
 
-    function editarOrden(id, producto, cantidad) {
+    function editarOrden(id, id_receta, cantidad) {
       ordenIdInput.value = id;
-      productoInput.value = producto;
+      productoInput.value = id_receta;
       cantidadInput.value = cantidad;
       cancelEditBtn.style.display = 'inline-block';
     }
@@ -247,7 +269,10 @@
     window.editarOrden = editarOrden;
     window.eliminarOrden = eliminarOrden;
 
-    cargarMesas();
+    window.onload = () => {
+      cargarMesas();
+      cargarRecetas();
+    };
   </script>
 
 </body>
