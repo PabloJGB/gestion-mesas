@@ -120,29 +120,6 @@ app.get('/recetas', async (req, res) => {
   }
 });
 
-async function cargarOrdenesExistentes(mesa) {
-  const res = await fetch(`${API_URL}?no_mesa=${mesa}`);
-  const data = await res.json();
-  const tbody = document.getElementById('tablaOrdenesExistentes');
-  tbody.innerHTML = '';
-
-  data.forEach(orden => {
-    const row = document.createElement('tr');
-    row.innerHTML = `
-      <td>${orden.id_orden}</td>
-      <td>${orden.id_receta}</td>
-      <td>${orden.nombre_receta}</td>
-      <td>${orden.precio}</td>
-      <td><input type="number" value="${orden.cantidad}" min="1" onchange="editarCantidad(${orden.id_orden}, this.value)"></td>
-      <td>${orden.fecha_hora}</td>
-      <td>
-        <button onclick="eliminarOrden(${orden.id_orden})">Eliminar</button>
-      </td>
-    `;
-    tbody.appendChild(row);
-  });
-}
-
 
 // Iniciar servidor
 app.listen(port, () => {

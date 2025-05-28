@@ -1,184 +1,142 @@
-document.addEventListener('DOMContentLoaded', () => {
-  const recetasSelect = document.getElementById('nombreReceta');
-  const idRecetaInput = document.getElementById('idReceta');
-  const precioInput = document.getElementById('precio');
-  const cantidadInput = document.getElementById('cantidad');
-  const enviarBtn = document.getElementById('enviarBtn');
-  const ordenesBody = document.getElementById('ordenesBody');
 
-  const mesaActual = 1; // Puedes cambiar esto si manejas varias mesas
+document.addEventListener("DOMContentLoaded", async () => {
+  const API_URL = 'https://backend-mesas.onrender.com/ordenes';
+  const RECETAS_URL = 'https://backend-mesas.onrender.com/recetas';
 
-  let recetasMap = {}; // Guardar recetas por nombre para acceso rápido
+  const listaMesas = document.getElementById("listaMesas");
+  const infoMesa = document.getElementById("infoMesa");
+  const ordenesContainer = document.getElementById("ordenesContainer");
 
-document.addEventListener('DOMContentLoaded', () => {
-  const mesasContainer = document.getElementById('mesasContainer');
+  const nombreComidaInput = document.getElementById("nombreComida");
+  const idRecetaInput = document.getElementById("idReceta");
+  const precioInput = document.getElementById("precio");
+  const cantidadInput = document.getElementById("cantidad");
+
+  const enviarOrdenBtn = document.getElementById("enviarOrden");
+
   let mesaActual = null;
 
-  // Obtener mesas desde el backend
-  fetch('https://backend-mesas.onrender.com/mesas')
-    .then(res => res.json())
-    .then(mesas => {
-      mesas.forEach(mesa => {
-  const btn = document.createElement('button');
-  btn.textContent = `Mesa ${mesa.noMesa}`;
-  btn.classList.add('btn-mesa');
-  btn.addEventListener('click', () => {
-    mesaActual = mesa.noMesa;
-    mesaSeleccionadaTexto.textContent = `Mesa seleccionada: ${mesa.noMesa}`;
-    cargarOrdenes();
-
-    // Quitar clase 'activa' a todos los botones
-    document.querySelectorAll('.btn-mesa').forEach(b => b.classList.remove('activa'));
-    // Agregar clase 'activa' al botón seleccionado
-    btn.classList.add('btn-mesa');
+  // Cargar mesas
+  const mesas = Array.from({ length: 10 }, (_, i) => `Mesa ${i + 1}`);
+  mesas.forEach(mesa => {
+    const div = document.createElement("div");
+    div.textContent = mesa;
+    div.className = "mesa";
+    div.addEventListener("click", async () => {
+      mesaActual = mesa;
+      infoMesa.textContent = `Órdenes para ${mesa}`;
+      await mostrarOrdenes(mesa);
+    });
+    listaMesas.appendChild(div);
   });
-  mesasContainer.appendChild(btn);
-});
 
-    });
+  // Autocompletar nombre de comida
+  nombreComidaInput.addEventListener("input", async () => {
+    const nombre = nombreComidaInput.value.toLowerCase();
 
-  // Tu código actual...
-  // Reemplaza esto:
-  // const mesaActual = 1;
-  // por esto:
-  // let mesaActual = null; (ya está arriba)
+    try {
+      const response = await fetch(RECETAS_URL);
+      const recetas = await response.json();
 
-  // Asegúrate de que cargarOrdenes use `mesaActual` correctamente
-  function cargarOrdenes() {
-    if (!mesaActual) return;
-    ordenesBody.innerHTML = '';
-    fetch(`https://backend-mesas.onrender.com/ordenes?mesa=${mesaActual}`)
-      .then(response => response.json())
-      .then(data => {
-        data.forEach(orden => {
-          const fila = document.createElement('tr');
-          fila.innerHTML = `
-            <td>${orden.idOrden}</td>
-            <td>${orden.idReceta}</td>
-            <td>${orden.nombreReceta}</td>
-            <td>${orden.precio.toFixed(2)}</td>
-            <td>${orden.cantidad}</td>
-            <td>${orden.fechaHora.replace('T', ' ').slice(0, 19)}</td>
-          `;
-          ordenesBody.appendChild(fila);
-        });
-      });
-  }
-
-  // Agrega esta línea dentro del evento de enviar:
-  // if (!mesaActual) { alert('Selecciona una mesa.'); return; }
-
-  // Asegúrate de que enviar use `mesaActual`:
-  // const orden = { noMesa: mesaActual, ... };
-});
-
-
-  // Obtener recetas y llenar el select
-  fetch('https://backend-mesas.onrender.com/recetas')
-    .then(response => response.json())
-    .then(data => {
-      data.forEach(receta => {
-        recetasMap[receta.nombreReceta] = receta;
-        const option = document.createElement('option');
-        option.value = receta.nombreReceta;
-        option.textContent = receta.nombreReceta;
-        recetasSelect.appendChild(option);
-      });
-    });
-
-  // Al seleccionar una receta, precargar ID y precio
-  recetasSelect.addEventListener('change', () => {
-    const recetaSeleccionada = recetasMap[recetasSelect.value];
-    if (recetaSeleccionada) {
-      idRecetaInput.value = recetaSeleccionada.idReceta;
-      precioInput.value = recetaSeleccionada.precio;
-    } else {
-      idRecetaInput.value = '';
-      precioInput.value = '';
+      const receta = recetas.find(r => r.nombre_receta.toLowerCase() === nombre);
+      if (receta) {
+        idRecetaInput.value = receta.id_receta;
+        precioInput.value = receta.precio;
+      } else {
+        idRecetaInput.value = "";
+        precioInput.value = "";
+      }
+    } catch (error) {
+      console.error("Error al obtener recetas:", error);
     }
   });
 
-  // Enviar orden a la base de datos
-  enviarBtn.addEventListener('click', () => {
-    const idReceta = parseInt(idRecetaInput.value);
-    const cantidad = parseInt(cantidadInput.value);
-    const fechaHora = new Date().toISOString().slice(0, 19).replace('T', ' '); // formato: YYYY-MM-DD HH:MM:SS
-
-    if (!idReceta || !cantidad) {
-      alert('Completa todos los campos antes de enviar.');
+  // Enviar orden a cocina
+  enviarOrdenBtn.addEventListener("click", async () => {
+    if (!mesaActual) {
+      alert("Por favor seleccione una mesa primero.");
       return;
     }
 
     const orden = {
-      noMesa: mesaActual,
-      idReceta: idReceta,
-      cantidad: cantidad,
-      fechaHora: fechaHora
+      id_receta: parseInt(idRecetaInput.value),
+      nombre_receta: nombreComidaInput.value,
+      precio: parseFloat(precioInput.value),
+      cantidad: parseInt(cantidadInput.value),
+      mesa: mesaActual,
+      fecha_hora: new Date().toISOString(),
     };
 
-    fetch('https://backend-mesas.onrender.com/ordenes', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(orden)
-    })
-      .then(res => res.text())
-      .then(msg => {
-        alert('Orden enviada');
-        cantidadInput.value = '';
-        recetasSelect.value = '';
-        idRecetaInput.value = '';
-        precioInput.value = '';
-        cargarOrdenes(); // refrescar tabla
-      })
-      .catch(err => console.error('Error al enviar orden:', err));
-  });
-
-  // Cargar órdenes por mesa
-  function cargarOrdenes() {
-    ordenesBody.innerHTML = '';
-    fetch(`https://backend-mesas.onrender.com/ordenes?mesa=${mesaActual}`)
-      .then(response => response.json())
-      .then(data => {
-        data.forEach(orden => {
-          const fila = document.createElement('tr');
-          fila.innerHTML = `
-            <td>${orden.idOrden}</td>
-            <td>${orden.idReceta}</td>
-            <td>${orden.nombreReceta}</td>
-            <td>${orden.precio.toFixed(2)}</td>
-            <td>${orden.cantidad}</td>
-            <td>${orden.fechaHora.replace('T', ' ').slice(0, 19)}</td>
-          `;
-          ordenesBody.appendChild(fila);
-        });
+    try {
+      await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(orden),
       });
-  }
-
-  async function editarCantidad(idOrden, nuevaCantidad) {
-  const confirmado = confirm(`¿Editar cantidad de orden #${idOrden} a ${nuevaCantidad}?`);
-  if (!confirmado) return;
-
-  await fetch(`${API_URL}/${idOrden}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ cantidad: parseInt(nuevaCantidad) })
+      await mostrarOrdenes(mesaActual);
+    } catch (error) {
+      console.error("Error al enviar la orden:", error);
+    }
   });
 
-  alert('Cantidad actualizada');
-  cargarOrdenesExistentes(mesaActual);
+
+//eliminar orden
+  async function eliminarOrden(idOrden) {
+  if (!confirm('¿Estás seguro de que deseas eliminar esta orden?')) return;
+
+  try {
+    const res = await fetch(`${API_URL}/${idOrden}`, {
+      method: 'DELETE'
+    });
+
+    if (res.ok) {
+      alert('Orden eliminada exitosamente');
+      cargarOrdenesExistentes(mesaActual);
+    } else {
+      alert('No se pudo eliminar la orden');
+    }
+  } catch (error) {
+    console.error('Error al eliminar orden:', error);
+    alert('Error al eliminar la orden');
+  }
 }
 
-async function eliminarOrden(idOrden) {
-  const confirmado = confirm(`¿Eliminar orden #${idOrden}?`);
-  if (!confirmado) return;
 
-  await fetch(`${API_URL}/${idOrden}`, { method: 'DELETE' });
-  alert('Orden eliminada');
-  cargarOrdenesExistentes(mesaActual);
-}
+  // Mostrar órdenes por mesa
+  async function mostrarOrdenes(mesa) {
+    ordenesContainer.innerHTML = "";
 
-  
+    try {
+      const response = await fetch(API_URL);
+      const ordenes = await response.json();
 
-  // Inicial
-  cargarOrdenes();
+      const responseRecetas = await fetch(RECETAS_URL);
+      const recetas = await responseRecetas.json();
+      const recetasPorId = Object.fromEntries(recetas.map(r => [r.id_receta, r]));
+
+      const ordenesMesa = ordenes.filter(o => o.mesa === mesa);
+
+      if (ordenesMesa.length === 0) {
+        ordenesContainer.textContent = "No hay órdenes para esta mesa.";
+        return;
+      }
+
+      ordenesMesa.forEach(orden => {
+        const receta = recetasPorId[orden.id_receta];
+        const div = document.createElement("div");
+        div.innerHTML = `
+          <strong>Orden:</strong> ${orden.id_orden}<br>
+          <strong>Receta:</strong> ${receta?.nombre_receta || "Desconocida"}<br>
+          <strong>Precio:</strong> Q.${receta?.precio?.toFixed(2) || "0.00"}<br>
+          <strong>Cantidad:</strong> ${orden.cantidad}<br>
+          <strong>Fecha:</strong> ${new Date(orden.fecha_hora).toLocaleString()}<br><hr>
+        `;
+        ordenesContainer.appendChild(div);
+      });
+    } catch (error) {
+      console.error("Error al mostrar órdenes:", error);
+      ordenesContainer.textContent = "No se pudieron cargar las órdenes.";
+    }
+  }
 });
+
