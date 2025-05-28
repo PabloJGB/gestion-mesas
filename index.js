@@ -41,12 +41,12 @@ app.get('/ordenes', async (req, res) => {
 });
 
 // Obtener órdenes por número de mesa (solo una ruta)
-app.get('/ordenes/mesa/:numero', async (req, res) => {
+app.get('/ordenes/no_mesa/:numero', async (req, res) => {
   const mesa = parseInt(req.params.numero);
   if (!mesa) return res.status(400).json({ error: 'Número de mesa inválido' });
 
   try {
-    const result = await pool.query('SELECT * FROM ordenes WHERE mesa = $1 ORDER BY id', [mesa]);
+    const result = await pool.query('SELECT * FROM ordenes WHERE no_mesa = $1 ORDER BY id', [no_mesa]);
     res.json(result.rows);
   } catch (error) {
     console.error('Error al obtener órdenes por mesa:', error);
