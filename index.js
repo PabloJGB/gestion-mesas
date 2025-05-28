@@ -101,6 +101,34 @@ app.get('/mesas', async (req, res) => {
   }
 });
 
+app.get('/ordenes/mesa/:mesaNumero', async (req, res) => {
+  const mesa = parseInt(req.params.mesaNumero);
+  if (isNaN(mesa)) {
+    return res.status(400).json({ error: 'Número de mesa inválido' });
+  }
+
+  try {
+    const result = await db.query(`
+      SELECT 
+        o.id,
+        o.receta_id,
+        r.nombre AS receta_nombre,
+        r.precio,
+        o.cantidad,
+        o.fecha
+      FROM ordenes o
+      JOIN recetas r ON o.receta_id = r.id
+      WHERE o.mesa = $1
+      ORDER BY o.fecha DESC
+    `, [mesa]);
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error al obtener órdenes:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
 // Iniciar servidor
 app.listen(port, () => {
   console.log(`✅ Backend corriendo en http://localhost:${port}`);

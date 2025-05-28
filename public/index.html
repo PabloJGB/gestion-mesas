@@ -102,13 +102,16 @@
       <button type="button" id="cancelEdit" style="display:none;">Cancelar</button>
     </form>
 
+    <!-- Cambiar encabezado de la tabla -->
     <table id="ordenesTable">
       <thead>
         <tr>
-          <th>ID</th>
-          <th>Producto</th>
+          <th>ID Orden</th>
+          <th>ID Receta</th>
+          <th>Nombre Receta</th>
+          <th>Precio</th>
           <th>Cantidad</th>
-          <th>Fecha</th>
+          <th>Fecha y Hora</th>
           <th>Acciones</th>
         </tr>
       </thead>
@@ -116,6 +119,7 @@
         <!-- Aquí van las órdenes -->
       </tbody>
     </table>
+
 
     <button id="volverMesa">Volver a selección de mesa</button>
   </section>
@@ -232,21 +236,19 @@
           const tr = document.createElement('tr');
           tr.innerHTML = `
             <td>${o.id}</td>
-            <td>${escapeHtml(o.producto)}</td>
+            <td>${o.receta_id}</td>
+            <td>${escapeHtml(o.receta_nombre)}</td>
+            <td>Q${parseFloat(o.precio).toFixed(2)}</td>
             <td>${o.cantidad}</td>
             <td>${new Date(o.fecha).toLocaleString()}</td>
             <td>
-              <button onclick="editarOrden(${o.id}, '${escapeJs(o.producto)}', ${o.cantidad})">Editar</button>
+              <button onclick="editarOrden(${o.id}, '${escapeJs(o.receta_nombre)}', ${o.cantidad})">Editar</button>
               <button onclick="eliminarOrden(${o.id})">Eliminar</button>
             </td>
           `;
           ordenesTableBody.appendChild(tr);
         });
-      } catch (error) {
-        alert('Error al cargar órdenes');
-        console.error(error);
-      }
-    }
+
 
     // Enviar formulario de orden (crear o editar)
     ordenForm.addEventListener('submit', async e => {
