@@ -5,6 +5,27 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Gestión de Mesas y Órdenes</title>
   <style>
+  
+  .btn-mesa {
+    margin: 5px;
+    padding: 8px 15px;
+    background-color: #e0e0e0;
+    border: 1px solid #999;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+
+  .btn-mesa:hover {
+    background-color: #c0c0c0;
+  }
+
+  .btn-mesa.activa {
+    background-color: #4CAF50;
+    color: white;
+    font-weight: bold;
+  }
+
     body { font-family: Arial, sans-serif; margin: 20px; }
     h1 { margin-bottom: 20px; }
     #listaMesas { display: flex; flex-wrap: wrap; gap: 10px; padding-left: 0; margin-bottom: 20px; }
@@ -70,6 +91,23 @@
 
   <button onclick="enviarOrden()">Enviar orden a cocina</button>
 
+  <h3>Órdenes existentes de esta mesa</h3>
+<table>
+  <thead>
+    <tr>
+      <th>ID Orden</th>
+      <th>ID Receta</th>
+      <th>Nombre Receta</th>
+      <th>Precio</th>
+      <th>Cantidad</th>
+      <th>Fecha y Hora</th>
+      <th>Acciones</th>
+    </tr>
+  </thead>
+  <tbody id="tablaOrdenesExistentes"></tbody>
+</table>
+
+
   <script>
   const API_URL = 'https://backend-mesas.onrender.com/ordenes';
   const MESAS_URL = 'https://backend-mesas.onrender.com/mesas';
@@ -105,11 +143,19 @@
     mesaActual = numero;
     mesaSeleccionadaSpan.textContent = numero;
     ordenesSection.style.display = 'block';
-    listaMesas.style.display = 'none';
+    //listaMesas.style.display = 'none';
+    cargarOrdenesExistentes(numero);
 
     document.querySelectorAll('#listaMesas li').forEach(li => {
       li.classList.toggle('selected', li.dataset.numero == numero);
     });
+
+    ordenesPendientes = [];
+    renderizarTabla();
+
+    document.getElementById('nombreReceta').selectedIndex = 0;
+    actualizarCampos();
+    document.getElementById('cantidad').value = 1;
   }
 
   
@@ -132,6 +178,29 @@
       });
       actualizarCampos();
     }
+
+    async function cargarOrdenesExistentes(mesa) {
+  const res = await fetch(`${API_URL}?no_mesa=${mesa}`);
+  const data = await res.json();
+  const tbody = document.getElementById('tablaOrdenesExistentes');
+  tbody.innerHTML = '';
+
+  data.forEach(orden => {
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td>${orden.id_orden}</td>
+      <td>${orden.id_receta}</td>
+      <td>${orden.nombre_receta}</td>
+      <td>${orden.precio}</td>
+      <td><input type="number" value="${orden.cantidad}" min="1" onchange="editarCantidad(${orden.id_orden}, this.value)"></td>
+      <td>${orden.fecha_hora}</td>
+      <td>
+        <button onclick="eliminarOrden(${orden.id_orden})">Eliminar</button>
+      </td>
+    `;
+    tbody.appendChild(row);
+  });
+}
 
     // Actualiza los campos de ID y precio al seleccionar receta
     function actualizarCampos() {

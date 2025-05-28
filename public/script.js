@@ -30,7 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Quitar clase 'activa' a todos los botones
     document.querySelectorAll('.btn-mesa').forEach(b => b.classList.remove('activa'));
     // Agregar clase 'activa' al botón seleccionado
-    btn.classList.add('activa');
+    btn.classList.add('btn-mesa');
   });
   mesasContainer.appendChild(btn);
 });
@@ -153,6 +153,31 @@ document.addEventListener('DOMContentLoaded', () => {
         });
       });
   }
+
+  async function editarCantidad(idOrden, nuevaCantidad) {
+  const confirmado = confirm(`¿Editar cantidad de orden #${idOrden} a ${nuevaCantidad}?`);
+  if (!confirmado) return;
+
+  await fetch(`${API_URL}/${idOrden}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cantidad: parseInt(nuevaCantidad) })
+  });
+
+  alert('Cantidad actualizada');
+  cargarOrdenesExistentes(mesaActual);
+}
+
+async function eliminarOrden(idOrden) {
+  const confirmado = confirm(`¿Eliminar orden #${idOrden}?`);
+  if (!confirmado) return;
+
+  await fetch(`${API_URL}/${idOrden}`, { method: 'DELETE' });
+  alert('Orden eliminada');
+  cargarOrdenesExistentes(mesaActual);
+}
+
+  
 
   // Inicial
   cargarOrdenes();
