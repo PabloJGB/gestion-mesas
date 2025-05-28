@@ -131,3 +131,29 @@ app.get('/ordenes/mesa/:mesaNumero', async (req, res) => {
 app.listen(port, () => {
   console.log(✅ Backend corriendo en http://localhost:${port});
 });
+
+// Backend: obtener recetas
+app.get('/recetas', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT id_receta, nombre_receta, precio FROM recetas ORDER BY nombre_receta');
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error al obtener recetas:', error);
+    res.status(500).json({ error: 'Error al obtener recetas' });
+  }
+});
+
+const id_receta = parseInt(recetaSelect.value);
+const cantidad = parseInt(cantidadInput.value);
+
+const ordenData = {
+  no_mesa: mesaActual,
+  id_receta,
+  cantidad
+};
+
+const res = await fetch(`${API_URL}${id ? '/' + id : ''}`, {
+  method: id ? 'PUT' : 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(ordenData)
+});

@@ -87,3 +87,23 @@ function entrarMesa(num) {
   app.get('/', (req, res) => {
   res.send('API funcionando correctamente');
 });
+
+const recetaSelect = document.getElementById('id_receta');
+
+async function cargarRecetas() {
+  try {
+    const res = await fetch('https://backend-mesas.onrender.com/recetas');
+    const recetas = await res.json();
+
+    recetaSelect.innerHTML = '';
+    recetas.forEach(r => {
+      const option = document.createElement('option');
+      option.value = r.id_receta;
+      option.textContent = `${r.nombre_receta} - Q${parseFloat(r.precio).toFixed(2)}`;
+      recetaSelect.appendChild(option);
+    });
+  } catch (err) {
+    alert('Error al cargar recetas');
+    console.error(err);
+  }
+}
