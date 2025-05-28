@@ -28,6 +28,11 @@ async function cargarMesas() {
 }
 
 async function cargarRecetas() {
+  if (!recetaSelect) {
+    console.warn('El elemento #id_receta no está presente en el DOM.');
+    return;
+  }
+
   try {
     const res = await fetch('https://backend-mesas.onrender.com/recetas');
     const recetas = await res.json();
@@ -83,7 +88,7 @@ ordenForm.addEventListener('submit', async e => {
   e.preventDefault();
 
   const id = ordenIdInput.value;
-  const id_receta = recetaSelect.value;
+  const id_receta = recetaSelect ? recetaSelect.value : null;
   const cantidad = parseInt(cantidadInput.value);
 
   if (!id_receta || !cantidad || cantidad < 1) {
