@@ -138,5 +138,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       ordenesContainer.textContent = "No se pudieron cargar las órdenes.";
     }
   }
+
+  
 });
 

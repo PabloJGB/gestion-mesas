@@ -30,29 +30,17 @@ app.get('/ordenes', async (req, res) => {
 });
 
 // Obtener órdenes por mesa
-app.get('/ordenes/mesa/:mesaNumero', async (req, res) => {
-  const mesa = parseInt(req.params.mesaNumero);
-  try {
-    const resultado = await pool.query(`
-      SELECT 
-        o.id_orden,
-        o.id_receta,
-        r.nombre_receta,
-        r.precio AS precio_receta,
-        o.cantidad,
-        o.fecha_hora
-      FROM ordenes o
-      JOIN recetas r ON o.id_receta = r.id_receta
-      WHERE o.no_mesa = $1
-      ORDER BY o.fecha_hora DESC
-    `, [mesa]);
+app.get('/ordenes', async (req, res) => {
+  const no_mesa = req.query.no_mesa;
 
-    res.json(resultado.rows);
-  } catch (error) {
-    console.error('Error al obtener órdenes por mesa:', error);
-    res.status(500).json({ error: 'Error al obtener órdenes por mesa' });
+  if (!no_mesa) {
+    return res.status(400).json({ error: 'Falta el parámetro no_mesa' });
   }
+
+  const [rows] = await db.query('SELECT * FROM ordenes WHERE no_mesa = ?', [no_mesa]);
+  res.json(rows);
 });
+
 
 // Crear orden
 app.post('/ordenes', async (req, res) => {
