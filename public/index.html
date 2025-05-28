@@ -1,4 +1,3 @@
-index.html
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -108,7 +107,7 @@ index.html
         mesas.forEach(mesa => {
           const numeroMesa = mesa.numero ?? mesa;
           const li = document.createElement('li');
-          li.textContent = Mesa ${numeroMesa};
+          li.textContent = `Mesa ${numeroMesa}`;
           li.dataset.numero = numeroMesa;
           li.addEventListener('click', () => seleccionarMesa(numeroMesa));
           listaMesas.appendChild(li);
@@ -148,18 +147,18 @@ index.html
       if (!mesaActual) return;
 
       try {
-        const res = await fetch(${API_URL}/mesa/${mesaActual});
+        const res = await fetch(`${API_URL}/mesa/${mesaActual}`);
         const ordenes = await res.json();
         ordenesTableBody.innerHTML = '';
 
         if (!ordenes.length) {
-          ordenesTableBody.innerHTML = <tr><td colspan="7">No hay órdenes para esta mesa.</td></tr>;
+          ordenesTableBody.innerHTML = `<tr><td colspan="7">No hay órdenes para esta mesa.</td></tr>`;
           return;
         }
 
         ordenes.forEach(o => {
           const tr = document.createElement('tr');
-          tr.innerHTML = 
+          tr.innerHTML = `
             <td>${o.id_orden}</td>
             <td>${o.id_receta}</td>
             <td>${escapeHtml(o.nombre_receta)}</td>
@@ -170,7 +169,7 @@ index.html
               <button onclick="editarOrden(${o.id_orden}, '${escapeJs(o.nombre_receta)}', ${o.cantidad})">Editar</button>
               <button onclick="eliminarOrden(${o.id_orden})">Eliminar</button>
             </td>
-          ;
+          `;
           ordenesTableBody.appendChild(tr);
         });
 
@@ -200,7 +199,7 @@ index.html
       const ordenData = { mesa: mesaActual, producto, cantidad };
 
       try {
-        const res = await fetch(${API_URL}${id ? '/' + id : ''}, {
+        const res = await fetch(`${API_URL}${id ? '/' + id : ''}`, {
           method: id ? 'PUT' : 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(ordenData)
@@ -235,7 +234,7 @@ index.html
       if (!confirm('¿Deseas eliminar esta orden?')) return;
 
       try {
-        const res = await fetch(${API_URL}/${id}, { method: 'DELETE' });
+        const res = await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
         if (!res.ok) throw new Error('Error al eliminar');
         cargarOrdenesMesa();
       } catch (error) {
