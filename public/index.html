@@ -30,8 +30,23 @@
 
   <h2>Gestión de Órdenes por Mesa</h2>
 
-  <label for="mesa">Número de mesa:</label>
-  <input type="number" id="mesa" value="1" min="1">
+  <div id="mesasContainer"></div>
+  <h2 id="mesaSeleccionada">Mesa seleccionada: Ninguna</h2>
+  
+  <style>
+    .btn-mesa {
+      margin: 5px;
+      padding: 10px;
+      background-color: #ddd;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .btn-mesa:hover {
+      background-color: #bbb;
+    }
+  </style>
+
 
   <h3>Agregar orden</h3>
 

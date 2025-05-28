@@ -124,3 +124,12 @@ app.get('/recetas', async (req, res) => {
 app.listen(port, () => {
   console.log(`✅ Backend corriendo en http://localhost:${port}`);
 });
+
+// Obtener todas las mesas distintas con órdenes registradas
+app.get('/mesas', (req, res) => {
+  const sql = 'SELECT DISTINCT no_mesa AS noMesa FROM ordenes ORDER BY no_mesa';
+  db.query(sql, (err, results) => {
+    if (err) return res.status(500).send('Error al obtener mesas');
+    res.json(results);
+  });
+});

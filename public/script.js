@@ -10,6 +10,63 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let recetasMap = {}; // Guardar recetas por nombre para acceso rápido
 
+document.addEventListener('DOMContentLoaded', () => {
+  const mesasContainer = document.getElementById('mesasContainer');
+  let mesaActual = null;
+
+  // Obtener mesas desde el backend
+    fetch('https://backend-mesas.onrender.com/mesas')
+      .then(res => res.json())
+      .then(mesas => {
+        mesas.forEach(mesa => {
+          const btn = document.createElement('button');
+          btn.textContent = `Mesa ${mesa.noMesa}`;
+          btn.classList.add('btn-mesa');
+          btn.addEventListener('click', () => {
+            mesaActual = mesa.noMesa;
+            cargarOrdenes();
+            document.getElementById('mesaSeleccionada').textContent = `Mesa ${mesa.noMesa}`;
+          });
+          mesasContainer.appendChild(btn);
+        });
+      });
+
+    // Tu código actual...
+    // Reemplaza esto:
+    // const mesaActual = 1;
+    // por esto:
+    // let mesaActual = null; (ya está arriba)
+
+    // Asegúrate de que cargarOrdenes use `mesaActual` correctamente
+    function cargarOrdenes() {
+      if (!mesaActual) return;
+      ordenesBody.innerHTML = '';
+      fetch(`https://backend-mesas.onrender.com/ordenes?mesa=${mesaActual}`)
+        .then(response => response.json())
+        .then(data => {
+          data.forEach(orden => {
+            const fila = document.createElement('tr');
+            fila.innerHTML = `
+              <td>${orden.idOrden}</td>
+              <td>${orden.idReceta}</td>
+              <td>${orden.nombreReceta}</td>
+              <td>${orden.precio.toFixed(2)}</td>
+              <td>${orden.cantidad}</td>
+              <td>${orden.fechaHora.replace('T', ' ').slice(0, 19)}</td>
+            `;
+            ordenesBody.appendChild(fila);
+          });
+        });
+    }
+
+    // Agrega esta línea dentro del evento de enviar:
+    // if (!mesaActual) { alert('Selecciona una mesa.'); return; }
+
+    // Asegúrate de que enviar use `mesaActual`:
+    // const orden = { noMesa: mesaActual, ... };
+  });
+
+
   // Obtener recetas y llenar el select
   fetch('https://backend-mesas.onrender.com/recetas')
     .then(response => response.json())
