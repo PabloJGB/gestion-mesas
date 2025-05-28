@@ -18,28 +18,55 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-// Obtener todas las órdenes
+// Obtener órdenes (todas o por mesa si se especifica no_mesa)
 app.get('/ordenes', async (req, res) => {
+  const noMesa = req.query.no_mesa;
+  let query = 'SELECT * FROM ordenes';
+  let params = [];
+
+  if (noMesa) {
+    query += ' WHERE no_mesa = ?';
+    params.push(noMesa);
+  }
+
   try {
-    const result = await pool.query('SELECT * FROM ordenes ORDER BY no_mesa, id_orden');
-    res.json(result.rows);
+    const [rows] = await db.execute(query, params);
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Error obteniendo órdenes' });
+  }
+});
+
+
+
+async function cargarOrdenesExistentes(noMesa) {
+  try {
+    const res = await fetch(`${API_URL}?no_mesa=${noMesa}`);
+    if (!res.ok) throw new Error('No se pudieron cargar órdenes');
+    const ordenes = await res.json();
+    tablaOrdenes.innerHTML = '';
+    ordenes.forEach(orden => {
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${orden.id_orden}</td>
+        <td>${orden.id_receta}</td>
+        <td>${orden.nombre_receta}</td>
+        <td>${orden.precio}</td>
+        <td>
+          <input type="number" min="1" value="${orden.cantidad}" 
+            onchange="editarCantidad(${orden.id_orden}, this.value)">
+        </td>
+        <td>${new Date(orden.fecha_hora).toLocaleString()}</td>
+        <td><button onclick="eliminarOrden(${orden.id_orden})">Eliminar</button></td>
+      `;
+      tablaOrdenes.appendChild(row);
+    });
   } catch (error) {
-    console.error('Error al obtener órdenes:', error);
-    res.status(500).json({ error: 'Error al obtener órdenes' });
+    alert('Error cargando órdenes: ' + error.message);
   }
-});
+}
 
-// Obtener órdenes por mesa
-app.get('/ordenes', async (req, res) => {
-  const no_mesa = req.query.no_mesa;
 
-  if (!no_mesa) {
-    return res.status(400).json({ error: 'Falta el parámetro no_mesa' });
-  }
-
-  const [rows] = await db.query('SELECT * FROM ordenes WHERE no_mesa = ?', [no_mesa]);
-  res.json(rows);
-});
 
 
 // Crear orden
@@ -108,10 +135,7 @@ app.get('/recetas', async (req, res) => {
   }
 });
 
-
 // Iniciar servidor
 app.listen(port, () => {
   console.log(`✅ Backend corriendo en http://localhost:${port}`);
 });
-
-

@@ -1,4 +1,3 @@
-
 document.addEventListener("DOMContentLoaded", async () => {
   const API_URL = 'https://backend-mesas.onrender.com/ordenes';
   const RECETAS_URL = 'https://backend-mesas.onrender.com/recetas';
@@ -16,16 +15,16 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   let mesaActual = null;
 
-  // Cargar mesas
-  const mesas = Array.from({ length: 10 }, (_, i) => `Mesa ${i + 1}`);
-  mesas.forEach(mesa => {
+  // Cargar mesas como números
+  const mesas = Array.from({ length: 10 }, (_, i) => i + 1);
+  mesas.forEach(numMesa => {
     const div = document.createElement("div");
-    div.textContent = mesa;
+    div.textContent = `Mesa ${numMesa}`;
     div.className = "mesa";
     div.addEventListener("click", async () => {
-      mesaActual = mesa;
-      infoMesa.textContent = `Órdenes para ${mesa}`;
-      await mostrarOrdenes(mesa);
+      mesaActual = numMesa;  // Guardamos número directamente
+      infoMesa.textContent = `Órdenes para Mesa ${numMesa}`;
+      await mostrarOrdenes(numMesa);
     });
     listaMesas.appendChild(div);
   });
@@ -58,13 +57,16 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
 
+    // Validar inputs mínimos
+    if (!idRecetaInput.value || !cantidadInput.value || cantidadInput.value <= 0) {
+      alert("Por favor ingrese un producto válido y cantidad mayor a 0.");
+      return;
+    }
+
     const orden = {
+      no_mesa: mesaActual,
       id_receta: parseInt(idRecetaInput.value),
-      nombre_receta: nombreComidaInput.value,
-      precio: parseFloat(precioInput.value),
       cantidad: parseInt(cantidadInput.value),
-      mesa: mesaActual,
-      fecha_hora: new Date().toISOString(),
     };
 
     try {
@@ -73,33 +75,49 @@ document.addEventListener("DOMContentLoaded", async () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(orden),
       });
+      // Limpiar inputs después de enviar
+      nombreComidaInput.value = "";
+      idRecetaInput.value = "";
+      precioInput.value = "";
+      cantidadInput.value = "";
+
       await mostrarOrdenes(mesaActual);
     } catch (error) {
       console.error("Error al enviar la orden:", error);
     }
   });
 
-
-//eliminar orden
+  // Eliminar orden
   async function eliminarOrden(idOrden) {
-  if (!confirm('¿Estás seguro de que deseas eliminar esta orden?')) return;
+    if (!confirm('¿Estás seguro de que deseas eliminar esta orden?')) return;
 
-  try {
-    const res = await fetch(`${API_URL}/${idOrden}`, {
-      method: 'DELETE'
-    });
+    try {
+      const res = await fetch(`${API_URL}/${idOrden}`, {
+        method: 'DELETE'
+      });
 
-    if (res.ok) {
-      alert('Orden eliminada exitosamente');
-      cargarOrdenesExistentes(mesaActual);
-    } else {
-      alert('No se pudo eliminar la orden');
+      if (res.ok) {
+        alert('Orden eliminada exitosamente');
+        await mostrarOrdenes(mesaActual);
+      } else {
+        alert('No se pudo eliminar la orden');
+      }
+    } catch (error) {
+      console.error('Error al eliminar orden:', error);
+      alert('Error al eliminar la orden');
     }
-  } catch (error) {
-    console.error('Error al eliminar orden:', error);
-    alert('Error al eliminar la orden');
   }
-}
+
+
+  //Orden pendiente
+  function eliminarOrdenPendiente(index) {
+    if (confirm('¿Estás seguro de eliminar esta orden?')) {
+      ordenesPendientes.splice(index, 1);
+      renderizarTabla();
+    }
+  }
+
+
 
 
   // Mostrar órdenes por mesa
@@ -107,29 +125,25 @@ document.addEventListener("DOMContentLoaded", async () => {
     ordenesContainer.innerHTML = "";
 
     try {
-      const response = await fetch(API_URL);
+      // Solicitar solo las órdenes de la mesa al backend
+      const response = await fetch(`${API_URL}?no_mesa=${mesa}`);
       const ordenes = await response.json();
 
-      const responseRecetas = await fetch(RECETAS_URL);
-      const recetas = await responseRecetas.json();
-      const recetasPorId = Object.fromEntries(recetas.map(r => [r.id_receta, r]));
-
-      const ordenesMesa = ordenes.filter(o => o.mesa === mesa);
-
-      if (ordenesMesa.length === 0) {
+      if (ordenes.length === 0) {
         ordenesContainer.textContent = "No hay órdenes para esta mesa.";
         return;
       }
 
-      ordenesMesa.forEach(orden => {
-        const receta = recetasPorId[orden.id_receta];
+      ordenes.forEach(orden => {
         const div = document.createElement("div");
         div.innerHTML = `
           <strong>Orden:</strong> ${orden.id_orden}<br>
-          <strong>Receta:</strong> ${receta?.nombre_receta || "Desconocida"}<br>
-          <strong>Precio:</strong> Q.${receta?.precio?.toFixed(2) || "0.00"}<br>
+          <strong>Receta:</strong> ${orden.nombre_receta}<br>
+          <strong>Precio:</strong> Q.${orden.precio_receta.toFixed(2)}<br>
           <strong>Cantidad:</strong> ${orden.cantidad}<br>
-          <strong>Fecha:</strong> ${new Date(orden.fecha_hora).toLocaleString()}<br><hr>
+          <strong>Fecha:</strong> ${new Date(orden.fecha_hora).toLocaleString()}<br>
+          <button onclick="eliminarOrden(${orden.id_orden})">Eliminar</button>
+          <hr>
         `;
         ordenesContainer.appendChild(div);
       });
@@ -139,6 +153,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  
+  // Exponer eliminarOrden para botón inline
+  window.eliminarOrden = eliminarOrden;
 });
-

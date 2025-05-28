@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Gestión de Mesas y Órdenes</title>
   <style>
@@ -13,18 +13,30 @@
       border-radius: 6px;
       cursor: pointer;
       transition: background-color 0.2s;
+      user-select: none;
     }
-
-    .btn-mesa:hover { background-color: #c0c0c0; }
+    .btn-mesa:hover {
+      background-color: #c0c0c0;
+    }
     .btn-mesa.activa {
-      background-color: #4CAF50;
+      background-color: #4caf50;
       color: white;
       font-weight: bold;
     }
-
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    h1 { margin-bottom: 20px; }
-    #listaMesas { display: flex; flex-wrap: wrap; gap: 10px; padding-left: 0; margin-bottom: 20px; }
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+    h1 {
+      margin-bottom: 20px;
+    }
+    #listaMesas {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding-left: 0;
+      margin-bottom: 20px;
+    }
     #listaMesas li {
       background-color: #007bff;
       color: white;
@@ -35,19 +47,41 @@
       transition: background-color 0.2s ease;
       user-select: none;
     }
-    #listaMesas li:hover { background-color: #0056b3; }
-    #listaMesas li.selected { background-color: #28a745; }
-    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
-    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-    th { background-color: #f4f4f4; }
-    input[type="text"], input[type="number"], select { padding: 5px; width: 150px; }
-    button { padding: 6px 12px; margin: 2px; cursor: pointer; }
-    form > div { margin-bottom: 10px; }
-    #ordenesSection { display: none; }
+    #listaMesas li:hover {
+      background-color: #0056b3;
+    }
+    #listaMesas li.selected {
+      background-color: #28a745;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 20px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: left;
+    }
+    th {
+      background-color: #f4f4f4;
+    }
+    input[type='text'], input[type='number'], select {
+      padding: 5px;
+      width: 150px;
+      margin-right: 10px;
+    }
+    button {
+      padding: 6px 12px;
+      margin: 2px;
+      cursor: pointer;
+    }
+    #ordenesSection {
+      display: none;
+    }
   </style>
 </head>
 <body>
-
   <h1>Gestión de Mesas y Órdenes</h1>
 
   <ul id="listaMesas"></ul>
@@ -61,15 +95,15 @@
     <select id="nombreReceta"></select>
 
     <label for="idReceta">ID Receta:</label>
-    <input type="text" id="idReceta" readonly>
+    <input type="text" id="idReceta" readonly />
 
     <label for="precio">Precio:</label>
-    <input type="text" id="precio" readonly>
+    <input type="text" id="precio" readonly />
 
     <label for="cantidad">Cantidad:</label>
-    <input type="number" id="cantidad" min="1" value="1">
+    <input type="number" id="cantidad" min="1" value="1" />
 
-    <button onclick="agregarOrden()">Agregar a orden</button>
+    <button id="btnAgregarOrden">Agregar a orden</button>
 
     <table>
       <thead>
@@ -80,12 +114,13 @@
           <th>Precio</th>
           <th>Cantidad</th>
           <th>Fecha y Hora</th>
+          <th>Acciones</th>
         </tr>
       </thead>
       <tbody id="tablaOrdenes"></tbody>
     </table>
 
-    <button onclick="enviarOrden()">Enviar orden a cocina</button>
+    <button id="btnEnviarOrden">Enviar orden a cocina</button>
 
     <h3>Órdenes existentes de esta mesa</h3>
     <table>
@@ -104,75 +139,91 @@
     </table>
   </section>
 
-  <script>
-    const API_URL = 'https://backend-mesas.onrender.com/ordenes';
-    const MESAS_URL = 'https://backend-mesas.onrender.com/mesas';
-    const RECETAS_URL = 'https://backend-mesas.onrender.com/recetas';
+<script>
+  const API_URL = 'https://backend-mesas.onrender.com/ordenes';
+  const MESAS_URL = 'https://backend-mesas.onrender.com/mesas';
+  const RECETAS_URL = 'https://backend-mesas.onrender.com/recetas';
 
-    const listaMesas = document.getElementById('listaMesas');
-    const ordenesSection = document.getElementById('ordenesSection');
-    const mesaSeleccionadaSpan = document.getElementById('mesaSeleccionada');
+  const listaMesas = document.getElementById('listaMesas');
+  const ordenesSection = document.getElementById('ordenesSection');
+  const mesaSeleccionadaSpan = document.getElementById('mesaSeleccionada');
 
-    let mesaActual = null;
-    let recetas = {};
-    let ordenesPendientes = [];
+  const nombreRecetaSelect = document.getElementById('nombreReceta');
+  const idRecetaInput = document.getElementById('idReceta');
+  const precioInput = document.getElementById('precio');
+  const cantidadInput = document.getElementById('cantidad');
 
-    async function cargarMesas() {
-      try {
-        const res = await fetch(MESAS_URL);
-        const mesas = await res.json();
+  const tablaOrdenesPendientes = document.getElementById('tablaOrdenes');
+  const tablaOrdenesExistentes = document.getElementById('tablaOrdenesExistentes');
 
-        listaMesas.innerHTML = '';
-        mesas.forEach(mesa => {
-          const numeroMesa = mesa.numero ?? mesa;
-          const li = document.createElement('li');
-          li.textContent = `Mesa ${numeroMesa}`;
-          li.dataset.numero = numeroMesa;
-          li.addEventListener('click', () => seleccionarMesa(numeroMesa));
-          listaMesas.appendChild(li);
-        });
-      } catch (error) {
-        alert('Error al cargar mesas');
-        console.error(error);
-      }
+  const btnAgregarOrden = document.getElementById('btnAgregarOrden');
+  const btnEnviarOrden = document.getElementById('btnEnviarOrden');
+
+  let mesaActual = null;
+  let recetas = {};
+  let ordenesPendientes = [];
+
+  async function cargarMesas() {
+    try {
+      const res = await fetch(MESAS_URL);
+      const mesas = await res.json();
+      listaMesas.innerHTML = '';
+      mesas.forEach(mesa => {
+        const numeroMesa = mesa.numero ?? mesa;
+        const li = document.createElement('li');
+        li.textContent = `Mesa ${numeroMesa}`;
+        li.dataset.numero = numeroMesa;
+        li.addEventListener('click', () => seleccionarMesa(numeroMesa));
+        listaMesas.appendChild(li);
+      });
+    } catch (error) {
+      alert('Error al cargar mesas');
+      console.error(error);
     }
+  }
 
-    async function cargarRecetas() {
-      const response = await fetch(RECETAS_URL);
-      const data = await response.json();
-      const select = document.getElementById('nombreReceta');
+  async function cargarRecetas() {
+    try {
+      const res = await fetch(RECETAS_URL);
+      const data = await res.json();
+      recetas = {};
+      nombreRecetaSelect.innerHTML = '';
       data.forEach(receta => {
         recetas[receta.nombre_receta] = receta;
         const option = document.createElement('option');
         option.value = receta.nombre_receta;
         option.textContent = receta.nombre_receta;
-        select.appendChild(option);
+        nombreRecetaSelect.appendChild(option);
       });
       actualizarCampos();
+    } catch (error) {
+      alert('Error al cargar recetas');
+      console.error(error);
     }
+  }
 
-    function seleccionarMesa(numero) {
-      mesaActual = numero;
-      mesaSeleccionadaSpan.textContent = numero;
-      ordenesSection.style.display = 'block';
-      cargarOrdenesExistentes(numero);
-      ordenesPendientes = [];
-      renderizarTabla();
+  function seleccionarMesa(numero) {
+    mesaActual = numero;
+    mesaSeleccionadaSpan.textContent = numero;
+    ordenesSection.style.display = 'block';
+    cargarOrdenesExistentes(numero);
+    ordenesPendientes = [];
+    renderizarTablaPendientes();
 
-      document.querySelectorAll('#listaMesas li').forEach(li => {
-        li.classList.toggle('selected', li.dataset.numero == numero);
-      });
+    document.querySelectorAll('#listaMesas li').forEach(li => {
+      li.classList.toggle('selected', li.dataset.numero == numero);
+    });
 
-      document.getElementById('nombreReceta').selectedIndex = 0;
-      actualizarCampos();
-      document.getElementById('cantidad').value = 1;
-    }
+    nombreRecetaSelect.selectedIndex = 0;
+    actualizarCampos();
+    cantidadInput.value = 1;
+  }
 
-    async function cargarOrdenesExistentes(mesa) {
+  async function cargarOrdenesExistentes(mesa) {
+    try {
       const res = await fetch(`${API_URL}?no_mesa=${mesa}`);
       const data = await res.json();
-      const tbody = document.getElementById('tablaOrdenesExistentes');
-      tbody.innerHTML = '';
+      tablaOrdenesExistentes.innerHTML = '';
 
       data.forEach(orden => {
         const row = document.createElement('tr');
@@ -181,100 +232,151 @@
           <td>${orden.id_receta}</td>
           <td>${orden.nombre_receta}</td>
           <td>${orden.precio}</td>
-          <td><input type="number" value="${orden.cantidad}" min="1" onchange="editarCantidad(${orden.id_orden}, this.value)"></td>
+          <td><input type="number" min="1" value="${orden.cantidad}" style="width:60px" onchange="editarCantidad(${orden.id_orden}, this.value)"></td>
           <td>${orden.fecha_hora}</td>
           <td><button onclick="eliminarOrden(${orden.id_orden})">Eliminar</button></td>
         `;
-        tbody.appendChild(row);
+        tablaOrdenesExistentes.appendChild(row);
       });
+    } catch (error) {
+      alert('Error al cargar órdenes existentes');
+      console.error(error);
+    }
+  }
+
+  function actualizarCampos() {
+    const nombre = nombreRecetaSelect.value;
+    if (recetas[nombre]) {
+      idRecetaInput.value = recetas[nombre].id_receta;
+      precioInput.value = recetas[nombre].precio;
+    } else {
+      idRecetaInput.value = '';
+      precioInput.value = '';
+    }
+  }
+
+  nombreRecetaSelect.addEventListener('change', actualizarCampos);
+
+  btnAgregarOrden.addEventListener('click', () => {
+    if (!mesaActual) {
+      alert('Seleccione una mesa primero.');
+      return;
+    }
+    const nombre = nombreRecetaSelect.value;
+    const receta = recetas[nombre];
+    const cantidad = parseInt(cantidadInput.value);
+
+    if (!receta) {
+      alert('Receta no válida');
+      return;
+    }
+    if (isNaN(cantidad) || cantidad < 1) {
+      alert('Cantidad debe ser al menos 1');
+      return;
     }
 
-    function actualizarCampos() {
-      const nombre = document.getElementById('nombreReceta').value;
-      if (recetas[nombre]) {
-        document.getElementById('idReceta').value = recetas[nombre].id_receta;
-        document.getElementById('precio').value = recetas[nombre].precio;
-      }
-    }
+    // Agregar a pendientes
+    ordenesPendientes.push({
+      id_receta: receta.id_receta,
+      nombre_receta: receta.nombre_receta,
+      precio: receta.precio,
+      cantidad: cantidad,
+      no_mesa: mesaActual,
+      fecha_hora: new Date().toISOString()
+    });
 
-    document.getElementById('nombreReceta').addEventListener('change', actualizarCampos);
+    renderizarTablaPendientes();
+  });
 
-    function agregarOrden() {
-      if (!mesaActual) {
-        alert('Primero selecciona una mesa');
-        return;
-      }
+  function renderizarTablaPendientes() {
+    tablaOrdenesPendientes.innerHTML = '';
+    ordenesPendientes.forEach((orden, i) => {
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>--</td>
+        <td>${orden.id_receta}</td>
+        <td>${orden.nombre_receta}</td>
+        <td>${orden.precio}</td>
+        <td>${orden.cantidad}</td>
+        <td>${new Date(orden.fecha_hora).toLocaleString()}</td>
+        <td><button data-index="${i}" class="btnEliminarPendiente">Eliminar</button></td>
+      `;
+      tablaOrdenesPendientes.appendChild(row);
+    });
 
-      const nombre = document.getElementById('nombreReceta').value;
-      const receta = recetas[nombre];
-      const cantidad = parseInt(document.getElementById('cantidad').value);
-      const fechaHora = new Date().toISOString().slice(0, 19).replace('T', ' ');
-
-      if (!receta || cantidad <= 0) {
-        alert('Verifica los datos');
-        return;
-      }
-
-      const orden = {
-        id_orden: '-',
-        id_receta: receta.id_receta,
-        nombre_receta: receta.nombre_receta,
-        precio: receta.precio,
-        cantidad,
-        fecha_hora: fechaHora,
-        no_mesa: mesaActual
-      };
-
-      ordenesPendientes.push(orden);
-      renderizarTabla();
-    }
-
-    function renderizarTabla() {
-      const tbody = document.getElementById('tablaOrdenes');
-      tbody.innerHTML = '';
-      ordenesPendientes.forEach(orden => {
-        tbody.innerHTML += `
-          <tr>
-            <td>${orden.id_orden}</td>
-            <td>${orden.id_receta}</td>
-            <td>${orden.nombre_receta}</td>
-            <td>${orden.precio}</td>
-            <td>${orden.cantidad}</td>
-            <td>${orden.fecha_hora}</td>
-          </tr>`;
+    // Asignar evento eliminar
+    document.querySelectorAll('.btnEliminarPendiente').forEach(btn => {
+      btn.addEventListener('click', e => {
+        const index = parseInt(e.target.dataset.index);
+        ordenesPendientes.splice(index, 1);
+        renderizarTablaPendientes();
       });
+    });
+  }
+
+  btnEnviarOrden.addEventListener('click', async () => {
+    if (!mesaActual) {
+      alert('Seleccione una mesa primero.');
+      return;
     }
-
-    async function enviarOrden() {
-      if (!mesaActual || ordenesPendientes.length === 0) {
-        alert('Selecciona una mesa y agrega al menos una orden');
-        return;
-      }
-
+    if (ordenesPendientes.length === 0) {
+      alert('No hay órdenes pendientes para enviar.');
+      return;
+    }
+    try {
       for (const orden of ordenesPendientes) {
-        await fetch(API_URL, {
+        // Enviar orden al backend
+        const res = await fetch(API_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            no_mesa: orden.no_mesa,
-            id_receta: orden.id_receta,
-            cantidad: orden.cantidad,
-            fecha_hora: orden.fecha_hora
-          })
+          body: JSON.stringify(orden)
         });
+        if (!res.ok) throw new Error('Error enviando orden');
       }
-
-      alert('Orden enviada a cocina');
+      alert('Órdenes enviadas correctamente.');
       ordenesPendientes = [];
-      renderizarTabla();
+      renderizarTablaPendientes();
       cargarOrdenesExistentes(mesaActual);
+    } catch (error) {
+      alert('Error al enviar órdenes: ' + error.message);
+      console.error(error);
     }
+  });
 
-    // Cargar todo al iniciar
-    document.addEventListener('DOMContentLoaded', async () => {
-      await cargarMesas();
-      await cargarRecetas();
-    });
-  </script>
+  window.editarCantidad = async function(idOrden, nuevaCantidad) {
+    if (nuevaCantidad < 1) {
+      alert('Cantidad debe ser al menos 1');
+      cargarOrdenesExistentes(mesaActual);
+      return;
+    }
+    try {
+      const res = await fetch(`${API_URL}/${idOrden}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cantidad: parseInt(nuevaCantidad) })
+      });
+      if (!res.ok) throw new Error('No se pudo actualizar cantidad');
+      cargarOrdenesExistentes(mesaActual);
+    } catch (error) {
+      alert('Error al actualizar cantidad: ' + error.message);
+    }
+  };
+
+  window.eliminarOrden = async function(idOrden) {
+    if (!confirm('¿Está seguro de eliminar esta orden?')) return;
+    try {
+      const res = await fetch(`${API_URL}/${idOrden}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('No se pudo eliminar orden');
+      cargarOrdenesExistentes(mesaActual);
+    } catch (error) {
+      alert('Error al eliminar orden: ' + error.message);
+    }
+  };
+
+  // Inicialización
+  cargarMesas();
+  cargarRecetas();
+</script>
+
 </body>
 </html>
