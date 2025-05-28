@@ -101,31 +101,6 @@ app.get('/mesas', async (req, res) => {
   }
 });
 
-app.get('/ordenes/mesa/:mesaNumero', async (req, res) => {
-  const mesa = parseInt(req.params.mesaNumero);
-  console.log('Mesa recibida:', mesa); // 👈 Asegúrate de ver esto
-
-  try {
-    const resultado = await pool.query(`
-      SELECT 
-        o.id_orden,
-        o.id_receta,
-        r.nombre_receta,
-        r.precio AS precio_receta,
-        o.cantidad,
-        o.fecha_hora
-      FROM ordenes o
-      JOIN recetas r ON o.id_receta = r.id_receta
-      WHERE o.no_mesa = $1;
-    `, [mesa]);
-
-    res.json(resultado.rows);
-  } catch (error) {
-    console.error('Error al obtener órdenes:', error);
-    res.status(500).json({ error: 'Error al obtener órdenes por mesa' });
-  }
-});
-
 
 // Iniciar servidor
 app.listen(port, () => {
