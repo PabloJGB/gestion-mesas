@@ -103,31 +103,29 @@ app.get('/mesas', async (req, res) => {
 
 app.get('/ordenes/mesa/:mesaNumero', async (req, res) => {
   const mesa = parseInt(req.params.mesaNumero);
-  if (isNaN(mesa)) {
-    return res.status(400).json({ error: 'Número de mesa inválido' });
-  }
+  console.log('Mesa recibida:', mesa); // 👈 Asegúrate de ver esto
 
   try {
-    const result = await db.query(`
+    const resultado = await pool.query(`
       SELECT 
-        o.id,
-        o.receta_id,
-        r.nombre AS receta_nombre,
-        r.precio,
+        o.id_orden,
+        o.id_receta,
+        r.nombre_receta,
+        r.precio AS precio_receta,
         o.cantidad,
-        o.fecha
+        o.fecha_hora
       FROM ordenes o
-      JOIN recetas r ON o.receta_id = r.id
-      WHERE o.mesa = $1
-      ORDER BY o.fecha DESC
+      JOIN recetas r ON o.id_receta = r.id_receta
+      WHERE o.no_mesa = $1;
     `, [mesa]);
 
-    res.json(result.rows);
+    res.json(resultado.rows);
   } catch (error) {
     console.error('Error al obtener órdenes:', error);
-    res.status(500).json({ error: 'Error interno del servidor' });
+    res.status(500).json({ error: 'Error al obtener órdenes por mesa' });
   }
 });
+
 
 // Iniciar servidor
 app.listen(port, () => {

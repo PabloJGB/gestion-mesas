@@ -5,23 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Gestión de Mesas y Órdenes</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 20px;
-    }
-
-    h1 {
-      margin-bottom: 20px;
-    }
-
-    #listaMesas {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      padding-left: 0;
-      margin-bottom: 20px;
-    }
-
+    /* --- Estilos Básicos --- */
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    h1 { margin-bottom: 20px; }
+    #listaMesas { display: flex; flex-wrap: wrap; gap: 10px; padding-left: 0; margin-bottom: 20px; }
     #listaMesas li {
       background-color: #007bff;
       color: white;
@@ -32,59 +19,23 @@
       transition: background-color 0.2s ease;
       user-select: none;
     }
-
-    #listaMesas li:hover {
-      background-color: #0056b3;
-    }
-
-    #listaMesas li.selected {
-      background-color: #28a745;
-    }
-
-    table {
-      border-collapse: collapse;
-      width: 100%;
-      margin-top: 20px;
-    }
-
-    th, td {
-      border: 1px solid #ccc;
-      padding: 8px;
-      text-align: left;
-    }
-
-    th {
-      background-color: #f4f4f4;
-    }
-
-    input[type="text"], input[type="number"] {
-      padding: 5px;
-      width: 150px;
-    }
-
-    button {
-      padding: 6px 12px;
-      margin: 2px;
-      cursor: pointer;
-    }
-
-    form > div {
-      margin-bottom: 10px;
-    }
-
-    #ordenesSection {
-      display: none;
-    }
+    #listaMesas li:hover { background-color: #0056b3; }
+    #listaMesas li.selected { background-color: #28a745; }
+    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+    th { background-color: #f4f4f4; }
+    input[type="text"], input[type="number"] { padding: 5px; width: 150px; }
+    button { padding: 6px 12px; margin: 2px; cursor: pointer; }
+    form > div { margin-bottom: 10px; }
+    #ordenesSection { display: none; }
   </style>
 </head>
 <body>
 
   <h1>Gestión de Mesas y Órdenes</h1>
 
-  <!-- Lista dinámica de mesas -->
   <ul id="listaMesas"></ul>
 
-  <!-- Sección de órdenes para la mesa seleccionada -->
   <section id="ordenesSection">
     <h2>Órdenes de la Mesa <span id="mesaSeleccionada"></span></h2>
 
@@ -102,7 +53,6 @@
       <button type="button" id="cancelEdit" style="display:none;">Cancelar</button>
     </form>
 
-    <!-- Cambiar encabezado de la tabla -->
     <table id="ordenesTable">
       <thead>
         <tr>
@@ -115,11 +65,8 @@
           <th>Acciones</th>
         </tr>
       </thead>
-      <tbody>
-        <!-- Aquí van las órdenes -->
-      </tbody>
+      <tbody></tbody>
     </table>
-
 
     <button id="volverMesa">Volver a selección de mesa</button>
   </section>
@@ -127,7 +74,6 @@
   <script>
     const API_URL = 'https://backend-mesas.onrender.com/ordenes';
     const MESAS_URL = 'https://backend-mesas.onrender.com/mesas';
-
 
     const listaMesas = document.getElementById('listaMesas');
     const ordenesSection = document.getElementById('ordenesSection');
@@ -142,21 +88,16 @@
 
     let mesaActual = null;
 
-    // Escape para texto HTML seguro
     function escapeHtml(text) {
-      return text.replace(/&/g, "&amp;")
-                 .replace(/</g, "&lt;")
-                 .replace(/>/g, "&gt;")
-                 .replace(/"/g, "&quot;")
+      return text.replace(/&/g, "&amp;").replace(/</g, "&lt;")
+                 .replace(/>/g, "&gt;").replace(/"/g, "&quot;")
                  .replace(/'/g, "&#039;");
     }
 
-    // Escape para insertar texto en JS inline (para onclick)
     function escapeJs(text) {
       return text.replace(/'/g, "\\'").replace(/"/g, '\\"');
     }
 
-    // Cargar la lista de mesas desde la API
     async function cargarMesas() {
       try {
         const res = await fetch(MESAS_URL);
@@ -164,8 +105,7 @@
 
         listaMesas.innerHTML = '';
         mesas.forEach(mesa => {
-          // Aquí asegúrate que mesa.numero exista y sea un número válido
-          const numeroMesa = mesa.numero ?? mesa; // en caso que el backend devuelva solo números sin objeto
+          const numeroMesa = mesa.numero ?? mesa;
           const li = document.createElement('li');
           li.textContent = `Mesa ${numeroMesa}`;
           li.dataset.numero = numeroMesa;
@@ -178,15 +118,12 @@
       }
     }
 
-    // Selección de una mesa
     function seleccionarMesa(numero) {
-      console.log('Mesa seleccionada:', numero);
       mesaActual = numero;
       mesaSeleccionadaSpan.textContent = numero;
       ordenesSection.style.display = 'block';
       listaMesas.style.display = 'none';
 
-      // Destacar mesa seleccionada en lista (por si vuelve)
       document.querySelectorAll('#listaMesas li').forEach(li => {
         li.classList.toggle('selected', li.dataset.numero == numero);
       });
@@ -194,7 +131,6 @@
       cargarOrdenesMesa();
     }
 
-    // Volver a la selección de mesas
     document.getElementById('volverMesa').addEventListener('click', () => {
       mesaActual = null;
       ordenForm.reset();
@@ -204,53 +140,45 @@
       ordenesSection.style.display = 'none';
       listaMesas.style.display = 'flex';
 
-      // Quitar selección visual
-      document.querySelectorAll('#listaMesas li').forEach(li => {
-        li.classList.remove('selected');
-      });
+      document.querySelectorAll('#listaMesas li').forEach(li => li.classList.remove('selected'));
     });
 
-    // Cargar órdenes de la mesa seleccionada
     async function cargarOrdenesMesa() {
-      if (!mesaActual) {
-        console.error('No hay mesa seleccionada');
-        return;
-      }
-      console.log('Cargando órdenes para mesa:', mesaActual);
+      if (!mesaActual) return;
+
       try {
         const res = await fetch(`${API_URL}/mesa/${mesaActual}`);
-        if (!res.ok) {
-          alert(`Error al cargar órdenes: ${res.statusText}`);
-          return;
-        }
         const ordenes = await res.json();
-
         ordenesTableBody.innerHTML = '';
-        if (ordenes.length === 0) {
-          const tr = document.createElement('tr');
-          tr.innerHTML = `<td colspan="5">No hay órdenes para esta mesa.</td>`;
-          ordenesTableBody.appendChild(tr);
+
+        if (!ordenes.length) {
+          ordenesTableBody.innerHTML = `<tr><td colspan="7">No hay órdenes para esta mesa.</td></tr>`;
           return;
         }
+
         ordenes.forEach(o => {
           const tr = document.createElement('tr');
           tr.innerHTML = `
-            <td>${o.id}</td>
-            <td>${o.receta_id}</td>
-            <td>${escapeHtml(o.receta_nombre)}</td>
-            <td>Q${parseFloat(o.precio).toFixed(2)}</td>
+            <td>${o.id_orden}</td>
+            <td>${o.id_receta}</td>
+            <td>${escapeHtml(o.nombre_receta)}</td>
+            <td>Q${parseFloat(o.precio_receta).toFixed(2)}</td>
             <td>${o.cantidad}</td>
-            <td>${new Date(o.fecha).toLocaleString()}</td>
+            <td>${new Date(o.fecha_hora).toLocaleString()}</td>
             <td>
-              <button onclick="editarOrden(${o.id}, '${escapeJs(o.receta_nombre)}', ${o.cantidad})">Editar</button>
-              <button onclick="eliminarOrden(${o.id})">Eliminar</button>
+              <button onclick="editarOrden(${o.id_orden}, '${escapeJs(o.nombre_receta)}', ${o.cantidad})">Editar</button>
+              <button onclick="eliminarOrden(${o.id_orden})">Eliminar</button>
             </td>
           `;
           ordenesTableBody.appendChild(tr);
         });
 
+      } catch (error) {
+        alert('Error al cargar órdenes');
+        console.error(error);
+      }
+    }
 
-    // Enviar formulario de orden (crear o editar)
     ordenForm.addEventListener('submit', async e => {
       e.preventDefault();
 
@@ -271,25 +199,13 @@
       const ordenData = { mesa: mesaActual, producto, cantidad };
 
       try {
-        let res;
-        if (id) {
-          res = await fetch(`${API_URL}/${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(ordenData)
-          });
-        } else {
-          res = await fetch(API_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(ordenData)
-          });
-        }
+        const res = await fetch(`${API_URL}${id ? '/' + id : ''}`, {
+          method: id ? 'PUT' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(ordenData)
+        });
 
-        if (!res.ok) {
-          alert('Error al guardar la orden.');
-          return;
-        }
+        if (!res.ok) throw new Error('Fallo al guardar');
 
         ordenForm.reset();
         ordenIdInput.value = '';
@@ -301,14 +217,12 @@
       }
     });
 
-    // Cancelar edición
     cancelEditBtn.addEventListener('click', () => {
       ordenForm.reset();
       ordenIdInput.value = '';
       cancelEditBtn.style.display = 'none';
     });
 
-    // Editar orden
     function editarOrden(id, producto, cantidad) {
       ordenIdInput.value = id;
       productoInput.value = producto;
@@ -316,17 +230,12 @@
       cancelEditBtn.style.display = 'inline-block';
     }
 
-    // Eliminar orden
     async function eliminarOrden(id) {
       if (!confirm('¿Deseas eliminar esta orden?')) return;
+
       try {
-        const res = await fetch(`${API_URL}/${id}`, {
-          method: 'DELETE'
-        });
-        if (!res.ok) {
-          alert('Error al eliminar la orden.');
-          return;
-        }
+        const res = await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('Error al eliminar');
         cargarOrdenesMesa();
       } catch (error) {
         alert('Error al eliminar la orden.');
@@ -334,15 +243,11 @@
       }
     }
 
-    // Hacer funciones globales para que funcionen en inline onclick
     window.editarOrden = editarOrden;
     window.eliminarOrden = eliminarOrden;
 
-    // Inicializar app
     cargarMesas();
-
   </script>
 
 </body>
 </html>
-
