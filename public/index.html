@@ -4,26 +4,28 @@
   <meta charset="UTF-8">
   <title>Gestión de Mesas</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 20px;
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    h1 { margin-bottom: 20px; }
+    #listaMesas { display: flex; flex-wrap: wrap; gap: 10px; padding-left: 0; margin-bottom: 20px; }
+    #listaMesas li {
+      background-color: #007bff;
+      color: white;
+      padding: 10px 16px;
+      border-radius: 5px;
+      cursor: pointer;
+      list-style: none;
+      transition: background-color 0.2s ease;
+      user-select: none;
     }
-    input, select, button {
-      margin: 5px;
-      padding: 5px;
-    }
-    table {
-      border-collapse: collapse;
-      width: 100%;
-      margin-top: 15px;
-    }
-    th, td {
-      border: 1px solid #ccc;
-      padding: 8px;
-    }
-    th {
-      background-color: #f2f2f2;
-    }
+    #listaMesas li:hover { background-color: #0056b3; }
+    #listaMesas li.selected { background-color: #28a745; }
+    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+    th { background-color: #f4f4f4; }
+    input[type="text"], input[type="number"], select { padding: 5px; width: 150px; }
+    button { padding: 6px 12px; margin: 2px; cursor: pointer; }
+    form > div { margin-bottom: 10px; }
+    #ordenesSection { display: none; }
   </style>
 </head>
 <body>
