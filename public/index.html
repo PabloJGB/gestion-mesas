@@ -1,3 +1,4 @@
+index.html
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -40,12 +41,17 @@
     <h2>Órdenes de la Mesa <span id="mesaSeleccionada"></span></h2>
 
     <form id="ordenForm">
+      <input type="hidden" id="ordenId" />
       <div>
         <label for="producto">Producto:</label>
-        <select id="producto" name="producto" required>
-          <option value="" disabled selected>Selecciona un producto</option>
-        </select>
+        <input type="text" id="producto" name="producto" required />
       </div>
+      <div>
+        <label for="cantidad">Cantidad:</label>
+        <input type="number" id="cantidad" name="cantidad" min="1" required />
+      </div>
+      <button type="submit">Guardar Orden</button>
+      <button type="button" id="cancelEdit" style="display:none;">Cancelar</button>
     </form>
 
     <table id="ordenesTable">
@@ -102,7 +108,7 @@
         mesas.forEach(mesa => {
           const numeroMesa = mesa.numero ?? mesa;
           const li = document.createElement('li');
-          li.textContent = `Mesa ${numeroMesa}`;
+          li.textContent = Mesa ${numeroMesa};
           li.dataset.numero = numeroMesa;
           li.addEventListener('click', () => seleccionarMesa(numeroMesa));
           listaMesas.appendChild(li);
@@ -142,18 +148,18 @@
       if (!mesaActual) return;
 
       try {
-        const res = await fetch(`${API_URL}/mesa/${mesaActual}`);
+        const res = await fetch(${API_URL}/mesa/${mesaActual});
         const ordenes = await res.json();
         ordenesTableBody.innerHTML = '';
 
         if (!ordenes.length) {
-          ordenesTableBody.innerHTML = `<tr><td colspan="7">No hay órdenes para esta mesa.</td></tr>`;
+          ordenesTableBody.innerHTML = <tr><td colspan="7">No hay órdenes para esta mesa.</td></tr>;
           return;
         }
 
         ordenes.forEach(o => {
           const tr = document.createElement('tr');
-          tr.innerHTML = `
+          tr.innerHTML = 
             <td>${o.id_orden}</td>
             <td>${o.id_receta}</td>
             <td>${escapeHtml(o.nombre_receta)}</td>
@@ -164,7 +170,7 @@
               <button onclick="editarOrden(${o.id_orden}, '${escapeJs(o.nombre_receta)}', ${o.cantidad})">Editar</button>
               <button onclick="eliminarOrden(${o.id_orden})">Eliminar</button>
             </td>
-          `;
+          ;
           ordenesTableBody.appendChild(tr);
         });
 
@@ -194,7 +200,7 @@
       const ordenData = { mesa: mesaActual, producto, cantidad };
 
       try {
-        const res = await fetch(`${API_URL}${id ? '/' + id : ''}`, {
+        const res = await fetch(${API_URL}${id ? '/' + id : ''}, {
           method: id ? 'PUT' : 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(ordenData)
@@ -229,7 +235,7 @@
       if (!confirm('¿Deseas eliminar esta orden?')) return;
 
       try {
-        const res = await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
+        const res = await fetch(${API_URL}/${id}, { method: 'DELETE' });
         if (!res.ok) throw new Error('Error al eliminar');
         cargarOrdenesMesa();
       } catch (error) {
