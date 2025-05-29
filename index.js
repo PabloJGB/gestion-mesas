@@ -130,6 +130,17 @@ app.put('/ordenes/:id', async (req, res) => {
   }
 });
 
+// Endpoint para obtener todas las recetas
+app.get('/recetas', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT id_receta, nombre_receta, precio FROM recetas ORDER BY nombre_receta');
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error al obtener recetas:', error);
+    res.status(500).json({ error: 'Error al obtener recetas' });
+  }
+});
+
 app.post('/ordenes', async (req, res) => {
   const { no_mesa, id_receta, cantidad } = req.body;
   

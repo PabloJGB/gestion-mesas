@@ -220,85 +220,72 @@
   }
 
 async function cargarOrdenesExistentes(mesa) {
-  const tabla = document.getElementById('tablaOrdenesExistentes');
-  tabla.innerHTML = '<tr><td colspan="7"><div class="loading">Cargando órdenes...</div></td></tr>';
-
   try {
     const response = await fetch(`${API_URL}?no_mesa=${mesa}`);
     
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.details || `Error ${response.status}`);
+      const errorData = await response.json();
+      throw new Error(errorData.details || `Error del servidor: ${response.status}`);
     }
 
     const ordenes = await response.json();
-    tabla.innerHTML = '';
+    const tablaBody = document.getElementById('tablaOrdenesExistentes');
+    tablaBody.innerHTML = '';
 
-    if (ordenes.length === 0) {
-      tabla.innerHTML = `
+    if (!ordenes || ordenes.length === 0) {
+      tablaBody.innerHTML = `
         <tr>
-          <td colspan="7" class="no-data">
-            <i class="fas fa-info-circle"></i> No hay órdenes para esta mesa
+          <td colspan="7" class="no-orders">
+            No hay órdenes para esta mesa
           </td>
         </tr>`;
       return;
     }
 
     ordenes.forEach(orden => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
+      const row = document.createElement('tr');
+      row.innerHTML = `
         <td>${orden.id_orden}</td>
         <td>${orden.id_receta}</td>
         <td>${orden.nombre_receta}</td>
-        <td class="price">$${orden.precio}</td>
+        <td>$${parseFloat(orden.precio).toFixed(2)}</td>
         <td>
-          <input type="number" 
-                 value="${orden.cantidad}" 
-                 min="1"
-                 class="qty-input"
-                 data-id="${orden.id_orden}"
-                 onchange="actualizarCantidad(${orden.id_orden}, this.value)">
+          <input type="number" min="1" value="${orden.cantidad}" 
+                 class="cantidad-input"
+                 data-id="${orden.id_orden}">
         </td>
-        <td>${formatDateTime(orden.fecha_hora)}</td>
+        <td>${new Date(orden.fecha_hora).toLocaleString()}</td>
         <td>
-          <button class="btn-delete" data-id="${orden.id_orden}">
-            <i class="fas fa-trash-alt"></i>
+          <button class="btn-eliminar" data-id="${orden.id_orden}">
+            Eliminar
           </button>
         </td>
       `;
-      tabla.appendChild(tr);
+      tablaBody.appendChild(row);
     });
 
-    // Agregar eventos dinámicos
-    document.querySelectorAll('.qty-input').forEach(input => {
-      input.addEventListener('blur', (e) => {
-        if (e.target.value !== e.target.defaultValue) {
-          actualizarCantidad(e.target.dataset.id, e.target.value);
-        }
+    // Agrega event listeners
+    document.querySelectorAll('.cantidad-input').forEach(input => {
+      input.addEventListener('change', (e) => {
+        editarCantidad(e.target.dataset.id, e.target.value);
+      });
+    });
+
+    document.querySelectorAll('.btn-eliminar').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        eliminarOrden(e.target.dataset.id);
       });
     });
 
   } catch (error) {
-    console.error('Error:', error);
-    tabla.innerHTML = `
+    console.error('Error al cargar órdenes:', error);
+    document.getElementById('tablaOrdenesExistentes').innerHTML = `
       <tr>
-        <td colspan="7" class="error">
-          <i class="fas fa-exclamation-triangle"></i> ${error.message}
+        <td colspan="7" class="error-message">
+          Error: ${error.message}
         </td>
       </tr>`;
   }
-}
-
-// Función auxiliar para formato de fecha
-function formatDateTime(dateTime) {
-  const options = {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  };
-  return new Date(dateTime).toLocaleString('es-ES', options);
 }
 
 // Función auxiliar para formatear fecha
