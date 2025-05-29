@@ -189,15 +189,6 @@ app.post('/ordenes', async (req, res) => {
   }
 });
 
-function actualizarTotalPedido(ordenes) {
-  let total = 0;
-  ordenes.forEach(orden => {
-    total += parseFloat(orden.precio) * parseInt(orden.cantidad);
-  });
-  document.getElementById("totalPedido").textContent = total.toFixed(2);
-}
-
-
 // Iniciar servidor
 app.listen(PORT, () => {
   console.log(`Servidor backend escuchando en el puerto ${PORT}`);
