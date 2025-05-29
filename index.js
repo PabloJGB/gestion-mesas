@@ -143,51 +143,68 @@ app.get('/recetas', async (req, res) => {
 
 app.post('/ordenes', async (req, res) => {
   const { no_mesa, id_receta, cantidad } = req.body;
-  
-  // Validación adicional
+
   if (!no_mesa || !id_receta || !cantidad) {
     return res.status(400).json({ error: 'Faltan campos requeridos' });
   }
 
+  const client = await pool.connect();
   try {
-    // Verificar que la receta exista
-    const recetaExists = await pool.query(
+    await client.query('BEGIN');
+
+    // Verificar que la receta existe
+    const recetaExists = await client.query(
       'SELECT 1 FROM recetas WHERE id_receta = $1', 
       [id_receta]
     );
-    
-    if (recetaExists.rows.length === 0) {
+    if (recetaExists.rowCount === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Receta no encontrada' });
     }
 
     // Insertar la orden
-    const result = await pool.query(
-      `INSERT INTO ordenes 
-       (no_mesa, id_receta, cantidad, fecha_hora) 
-       VALUES ($1, $2, $3, NOW()) 
+    const insertOrden = await client.query(
+      `INSERT INTO ordenes (no_mesa, id_receta, cantidad, fecha_hora)
+       VALUES ($1, $2, $3, NOW())
        RETURNING id_orden, no_mesa, id_receta, cantidad, fecha_hora`,
       [no_mesa, id_receta, cantidad]
     );
 
-    res.status(201).json({ 
+    // Obtener los ingredientes y cantidades por receta
+    const ingredientes = await client.query(`
+      SELECT id, cantidad
+      FROM receta_detalle
+      WHERE id_receta = $1
+    `, [id_receta]);
+
+    // Actualizar inventario
+    for (const row of ingredientes.rows) {
+      const idIngrediente = row.id;
+      const cantidadNecesaria = parseFloat(row.cantidad) * parseFloat(cantidad); // multiplicar por cantidad de recetas
+
+      await client.query(`
+        UPDATE inventario
+        SET cantidad = cantidad - $1
+        WHERE id = $2
+      `, [cantidadNecesaria, idIngrediente]);
+    }
+
+    await client.query('COMMIT');
+    res.status(201).json({
       success: true,
-      orden: result.rows[0],
-      message: 'Orden agregada correctamente' 
+      orden: insertOrden.rows[0],
+      message: 'Orden agregada y stock actualizado correctamente'
     });
-    
+
   } catch (err) {
-    console.error('Error en POST /ordenes:', {
-      error: err.message,
-      query: err.query,
-      stack: err.stack
-    });
-    
-    res.status(500).json({ 
-      error: 'Error al guardar la orden',
-      details: process.env.NODE_ENV === 'development' ? err.message : null
-    });
+    await client.query('ROLLBACK');
+    console.error('Error en POST /ordenes con descuento de inventario:', err);
+    res.status(500).json({ error: 'Error al guardar la orden o actualizar inventario' });
+  } finally {
+    client.release();
   }
 });
+
 
 // Iniciar servidor
 app.listen(PORT, () => {
