@@ -94,11 +94,15 @@ app.get('/test-db', async (req, res) => {
 
 // Endpoint único para crear órdenes con verificación de stock
 app.post('/ordenes', async (req, res) => {
-  // Aceptar tanto array como objeto único
+  // Convertir entrada a array si es un objeto único
   const ordenes = Array.isArray(req.body) ? req.body : [req.body];
   
+  // Validación básica
   if (!ordenes.length) {
-    return res.status(400).json({ error: 'No se recibieron órdenes para procesar' });
+    return res.status(400).json({ 
+      error: 'No se recibieron órdenes para procesar',
+      details: 'El cuerpo debe contener al menos una orden'
+    });
   }
 
   const client = await pool.connect();
@@ -112,80 +116,100 @@ app.post('/ordenes', async (req, res) => {
       detalles: {}
     };
 
-    // 1. PRIMERA PASADA: VALIDACIÓN COMPLETA
-    for (const orden of ordenes) {
+    // 1. PRIMERA FASE: VALIDACIÓN COMPLETA
+    for (const [index, orden] of ordenes.entries()) {
       const { no_mesa, id_receta, cantidad } = orden;
 
-      // Validación básica
+      // Validación básica de campos
       if (!no_mesa || !id_receta || !cantidad || isNaN(cantidad) || cantidad <= 0) {
         await client.query('ROLLBACK');
         return res.status(400).json({ 
           error: 'Datos de orden incompletos o inválidos',
-          ordenProblematica: orden
+          details: {
+            ordenIndex: index,
+            problema: !no_mesa ? 'Falta número de mesa' : 
+                     !id_receta ? 'Falta ID de receta' : 
+                     !cantidad ? 'Falta cantidad' : 
+                     'Cantidad debe ser un número positivo',
+            ordenRecibida: orden
+          }
         });
       }
 
-      // Obtener información de la receta
-      const receta = await client.query(
+      // Verificar existencia de receta
+      const recetaCheck = await client.query(
         'SELECT nombre_receta FROM recetas WHERE id_receta = $1', 
         [id_receta]
       );
       
-      if (!receta.rows.length) {
+      if (recetaCheck.rowCount === 0) {
         await client.query('ROLLBACK');
         return res.status(404).json({ 
-          error: `Receta con ID ${id_receta} no encontrada` 
+          error: `Receta con ID ${id_receta} no encontrada`,
+          details: {
+            ordenIndex: index,
+            id_recetaNoEncontrada: id_receta
+          }
         });
       }
 
-      const nombreReceta = receta.rows[0].nombre_receta;
+      const nombreReceta = recetaCheck.rows[0].nombre_receta;
 
-      // Verificar ingredientes
-      const ingredientes = await client.query(
-        `SELECT 
-          i.id, 
-          i.nombre AS nombre_ingrediente, 
-          i.stock, 
-          rd.cantidad AS cantidad_receta
-         FROM receta_detalle rd
-         JOIN inventario i ON rd.id = i.id
-         WHERE rd.id_receta = $1`,
-        [id_receta]
-      );
+      // Obtener ingredientes necesarios con JOIN a inventario
+      const ingredientesQuery = `
+        SELECT 
+          rd.id,
+          rd.cantidad AS cantidad_necesaria,
+          i.ingrediente,
+          i.stock
+        FROM receta_detalle rd
+        JOIN inventario i ON rd.id = i.id
+        WHERE rd.id_receta = $1
+      `;
+      
+      const ingredientesResult = await client.query(ingredientesQuery, [id_receta]);
 
-      // Buscar ingredientes insuficientes
-      const faltantes = ingredientes.rows.filter(
-        ing => ing.stock < (ing.cantidad_receta * cantidad)
-      );
+      // Verificar stock para cada ingrediente
+      const ingredientesFaltantes = [];
+      
+      for (const ing of ingredientesResult.rows) {
+        const cantidadNecesariaTotal = parseFloat(ing.cantidad_necesaria) * parseFloat(cantidad);
+        
+        if (ing.stock < cantidadNecesariaTotal) {
+          ingredientesFaltantes.push({
+            id_ingrediente: ing.id,
+            nombre: ing.ingrediente,
+            necesario: cantidadNecesariaTotal,
+            disponible: ing.stock,
+            faltante: cantidadNecesariaTotal - ing.stock
+          });
+        }
+      }
 
-      if (faltantes.length) {
+      if (ingredientesFaltantes.length > 0) {
         problemas.recetasInsuficientes.push(nombreReceta);
-        problemas.detalles[nombreReceta] = faltantes.map(ing => ({
-          ingrediente: ing.nombre_ingrediente,
-          necesario: ing.cantidad_receta * cantidad,
-          disponible: ing.stock,
-          faltante: (ing.cantidad_receta * cantidad) - ing.stock
-        }));
+        problemas.detalles[nombreReceta] = ingredientesFaltantes;
       }
     }
 
-    // Si hay problemas, retornar error detallado
-    if (problemas.recetasInsuficientes.length) {
+    // Si hay problemas de stock, retornar con detalles
+    if (problemas.recetasInsuficientes.length > 0) {
       await client.query('ROLLBACK');
       return res.status(400).json({
-        error: 'No hay suficiente stock para algunas recetas',
-        ...problemas
+        error: 'No hay suficiente stock para completar las órdenes',
+        recetasNoProcesadas: [...new Set(problemas.recetasInsuficientes)], // Eliminar duplicados
+        detallesProblemas: problemas.detalles
       });
     }
 
-    // 2. SEGUNDA PASADA: PROCESAMIENTO REAL
-    const ordenesProcesadas = [];
+    // 2. SEGUNDA FASE: PROCESAMIENTO REAL
+    const ordenesCreadas = [];
     
     for (const orden of ordenes) {
       const { no_mesa, id_receta, cantidad } = orden;
 
-      // Insertar orden
-      const nuevaOrden = await client.query(
+      // Insertar orden y obtener ID
+      const ordenInsertada = await client.query(
         `INSERT INTO ordenes 
          (no_mesa, id_receta, cantidad, fecha_hora)
          VALUES ($1, $2, $3, NOW())
@@ -193,7 +217,7 @@ app.post('/ordenes', async (req, res) => {
         [no_mesa, id_receta, cantidad]
       );
 
-      // Actualizar inventario
+      // Actualizar inventario para cada ingrediente
       const ingredientes = await client.query(
         `SELECT id, cantidad 
          FROM receta_detalle 
@@ -202,15 +226,17 @@ app.post('/ordenes', async (req, res) => {
       );
 
       for (const ing of ingredientes.rows) {
+        const cantidadTotal = parseFloat(ing.cantidad) * parseFloat(cantidad);
+        
         await client.query(
           `UPDATE inventario
            SET stock = stock - $1
            WHERE id = $2`,
-          [ing.cantidad * cantidad, ing.id]
+          [cantidadTotal, ing.id]
         );
       }
 
-      ordenesProcesadas.push(nuevaOrden.rows[0]);
+      ordenesCreadas.push(ordenInsertada.rows[0]);
     }
 
     await client.query('COMMIT');
@@ -218,21 +244,31 @@ app.post('/ordenes', async (req, res) => {
     return res.status(201).json({
       success: true,
       message: 'Órdenes procesadas exitosamente',
-      ordenes: ordenesProcesadas,
-      totalOrdenes: ordenesProcesadas.length
+      ordenesProcesadas: ordenesCreadas,
+      totalOrdenes: ordenesCreadas.length,
+      detalles: {
+        stockActualizado: true,
+        transaccionCompletada: true
+      }
     });
 
   } catch (error) {
     await client.query('ROLLBACK');
     console.error('Error crítico en POST /ordenes:', {
-      error: error.message,
-      stack: error.stack,
-      body: req.body
+      timestamp: new Date().toISOString(),
+      error: {
+        message: error.message,
+        stack: error.stack
+      },
+      requestBody: req.body
     });
     
     return res.status(500).json({
-      error: 'Error interno al procesar órdenes',
-      detalles: process.env.NODE_ENV === 'development' ? error.message : null
+      error: 'Error interno del servidor al procesar órdenes',
+      details: process.env.NODE_ENV === 'development' ? {
+        errorMessage: error.message,
+        errorType: error.name
+      } : null
     });
   } finally {
     client.release();
