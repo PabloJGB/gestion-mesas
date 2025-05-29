@@ -95,17 +95,67 @@ app.get('/test-db', async (req, res) => {
 // Endpoints CRUD (solo una implementación de cada)
 app.post('/ordenes', async (req, res) => {
   const { no_mesa, id_receta, cantidad } = req.body;
+  
+  if (!no_mesa || !id_receta || !cantidad) {
+    return res.status(400).json({ error: 'Faltan campos requeridos' });
+  }
+
+  const client = await pool.connect();
   try {
-    const result = await pool.query(
-      'INSERT INTO ordenes (no_mesa, id_receta, cantidad, fecha_hora) VALUES ($1, $2, $3, NOW()) RETURNING id_orden',
+    await client.query('BEGIN');
+
+    // Verificar que la receta exista
+    const recetaCheck = await client.query(
+      'SELECT nombre_receta FROM recetas WHERE id_receta = $1', 
+      [id_receta]
+    );
+    
+    if (recetaCheck.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Receta no encontrada' });
+    }
+
+    // Insertar la orden
+    const insertOrden = await client.query(
+      `INSERT INTO ordenes 
+       (no_mesa, id_receta, cantidad, fecha_hora) 
+       VALUES ($1, $2, $3, NOW()) 
+       RETURNING id_orden`,
       [no_mesa, id_receta, cantidad]
     );
-    res.status(201).json({ message: 'Orden agregada', id: result.rows[0].id_orden });
+
+    // Obtener los ingredientes de la receta
+    const ingredientes = await client.query(
+      `SELECT id, cantidad FROM receta_detalle WHERE id_receta = $1`,
+      [id_receta]
+    );
+
+    for (const ingrediente of ingredientes.rows) {
+      const idIngrediente = ingrediente.id;
+      const cantidadPorPlato = ingrediente.cantidad;
+      const cantidadTotal = cantidad * cantidadPorPlato;
+
+      // Actualizar el inventario
+      await client.query(
+        `UPDATE inventario 
+         SET stock = stock - $1 
+         WHERE id = $2`,
+        [cantidadTotal, idIngrediente]
+      );
+    }
+
+    await client.query('COMMIT');
+    res.status(201).json({ message: 'Orden agregada y stock actualizado correctamente' });
+
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Error agregando orden' });
+    await client.query('ROLLBACK');
+    console.error('Error al registrar orden y descontar inventario:', err);
+    res.status(500).json({ error: 'Error al registrar orden y descontar inventario' });
+  } finally {
+    client.release();
   }
 });
+
 
 app.delete('/ordenes/:id', async (req, res) => {
   const id = req.params.id;
