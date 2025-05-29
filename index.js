@@ -94,81 +94,101 @@ app.get('/test-db', async (req, res) => {
 
 // Endpoints CRUD (solo una implementación de cada)
 app.post('/ordenes', async (req, res) => {
-  const { no_mesa, id_receta, cantidad } = req.body;
+  const ordenes = req.body; // ahora es un array
 
-  if (!no_mesa || !id_receta || !cantidad) {
-    return res.status(400).json({ error: 'Faltan campos requeridos' });
+  if (!Array.isArray(ordenes) || ordenes.length === 0) {
+    return res.status(400).json({ error: 'Se requiere una lista de órdenes' });
   }
 
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
-    // Verificar que la receta exista
-    const recetaCheck = await client.query(
-      'SELECT nombre_receta FROM recetas WHERE id_receta = $1',
-      [id_receta]
-    );
+    const recetasInsuficientes = [];
 
-    if (recetaCheck.rowCount === 0) {
-      await client.query('ROLLBACK');
-      return res.status(404).json({ error: 'Receta no encontrada' });
+    for (const orden of ordenes) {
+      const { no_mesa, id_receta, cantidad } = orden;
+
+      if (!no_mesa || !id_receta || !cantidad) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: 'Campos incompletos en una orden' });
+      }
+
+      // Obtener nombre de receta
+      const recetaCheck = await client.query(
+        'SELECT nombre_receta FROM recetas WHERE id_receta = $1',
+        [id_receta]
+      );
+
+      if (recetaCheck.rowCount === 0) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ error: `Receta con ID ${id_receta} no encontrada` });
+      }
+
+      const nombreReceta = recetaCheck.rows[0].nombre_receta;
+
+      // Obtener ingredientes necesarios
+      const ingredientes = await client.query(
+        `SELECT rd.id AS id_ingrediente, rd.cantidad, i.stock
+         FROM receta_detalle rd
+         JOIN inventario i ON rd.id = i.id
+         WHERE rd.id_receta = $1`,
+        [id_receta]
+      );
+
+      // Validar stock
+      const faltantes = ingredientes.rows.filter(ing => ing.stock < ing.cantidad * cantidad);
+
+      if (faltantes.length > 0) {
+        recetasInsuficientes.push(nombreReceta);
+      }
     }
 
-    // Obtener ingredientes y cantidades necesarias
-    const ingredientes = await client.query(
-      `SELECT rd.id AS id_ingrediente, rd.cantidad, i.stock, i.ingrediente
-       FROM receta_detalle rd
-       JOIN inventario i ON rd.id = i.id
-       WHERE rd.id_receta = $1`,
-      [id_receta]
-    );
-
-    // Verificar si hay suficiente stock para cada ingrediente
-    const faltantes = ingredientes.rows.filter(ing => {
-      const cantidadTotal = ing.cantidad * cantidad;
-      return ing.stock < cantidadTotal;
-    });
-
-    if (faltantes.length > 0) {
+    if (recetasInsuficientes.length > 0) {
       await client.query('ROLLBACK');
       return res.status(400).json({
-        error: 'Stock insuficiente para uno o más ingredientes',
-        faltantes: faltantes.map(f => ({
-          ingrediente: f.ingrediente,
-          requerido: f.cantidad * cantidad,
-          disponible: f.stock
-        }))
+        error: 'Una o más recetas no pueden ser preparadas por falta de ingredientes',
+        recetasInsuficientes
       });
     }
 
-    // Insertar la orden
-    const insertOrden = await client.query(
-      `INSERT INTO ordenes 
-       (no_mesa, id_receta, cantidad, fecha_hora) 
-       VALUES ($1, $2, $3, NOW()) 
-       RETURNING id_orden`,
-      [no_mesa, id_receta, cantidad]
-    );
+    // Si todo bien, ahora insertar órdenes y descontar stock
+    for (const orden of ordenes) {
+      const { no_mesa, id_receta, cantidad } = orden;
 
-    // Descontar el stock
-    for (const ing of ingredientes.rows) {
-      const cantidadTotal = ing.cantidad * cantidad;
-      await client.query(
-        `UPDATE inventario 
-         SET stock = stock - $1 
-         WHERE id = $2`,
-        [cantidadTotal, ing.id_ingrediente]
+      const insertOrden = await client.query(
+        `INSERT INTO ordenes 
+         (no_mesa, id_receta, cantidad, fecha_hora) 
+         VALUES ($1, $2, $3, NOW()) 
+         RETURNING id_orden`,
+        [no_mesa, id_receta, cantidad]
       );
+
+      const ingredientes = await client.query(
+        `SELECT rd.id AS id_ingrediente, rd.cantidad
+         FROM receta_detalle rd
+         WHERE rd.id_receta = $1`,
+        [id_receta]
+      );
+
+      for (const ing of ingredientes.rows) {
+        const cantidadTotal = ing.cantidad * cantidad;
+        await client.query(
+          `UPDATE inventario 
+           SET stock = stock - $1 
+           WHERE id = $2`,
+          [cantidadTotal, ing.id_ingrediente]
+        );
+      }
     }
 
     await client.query('COMMIT');
-    res.status(201).json({ message: 'Orden agregada y stock actualizado correctamente' });
+    res.status(201).json({ message: 'Órdenes agregadas y stock descontado correctamente' });
 
   } catch (err) {
     await client.query('ROLLBACK');
-    console.error('Error al registrar orden y descontar inventario:', err);
-    res.status(500).json({ error: 'Error al registrar orden y descontar inventario' });
+    console.error('Error al procesar órdenes:', err);
+    res.status(500).json({ error: 'Error interno al procesar órdenes' });
   } finally {
     client.release();
   }
