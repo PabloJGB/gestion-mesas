@@ -95,7 +95,7 @@ app.get('/test-db', async (req, res) => {
 // Endpoints CRUD (solo una implementación de cada)
 app.post('/ordenes', async (req, res) => {
   const { no_mesa, id_receta, cantidad } = req.body;
-  
+
   if (!no_mesa || !id_receta || !cantidad) {
     return res.status(400).json({ error: 'Faltan campos requeridos' });
   }
@@ -106,13 +106,40 @@ app.post('/ordenes', async (req, res) => {
 
     // Verificar que la receta exista
     const recetaCheck = await client.query(
-      'SELECT nombre_receta FROM recetas WHERE id_receta = $1', 
+      'SELECT nombre_receta FROM recetas WHERE id_receta = $1',
       [id_receta]
     );
-    
+
     if (recetaCheck.rowCount === 0) {
       await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Receta no encontrada' });
+    }
+
+    // Obtener ingredientes y cantidades necesarias
+    const ingredientes = await client.query(
+      `SELECT rd.id AS id_ingrediente, rd.cantidad, i.stock, i.ingrediente
+       FROM receta_detalle rd
+       JOIN inventario i ON rd.id = i.id
+       WHERE rd.id_receta = $1`,
+      [id_receta]
+    );
+
+    // Verificar si hay suficiente stock para cada ingrediente
+    const faltantes = ingredientes.rows.filter(ing => {
+      const cantidadTotal = ing.cantidad * cantidad;
+      return ing.stock < cantidadTotal;
+    });
+
+    if (faltantes.length > 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        error: 'Stock insuficiente para uno o más ingredientes',
+        faltantes: faltantes.map(f => ({
+          ingrediente: f.ingrediente,
+          requerido: f.cantidad * cantidad,
+          disponible: f.stock
+        }))
+      });
     }
 
     // Insertar la orden
@@ -124,23 +151,14 @@ app.post('/ordenes', async (req, res) => {
       [no_mesa, id_receta, cantidad]
     );
 
-    // Obtener los ingredientes de la receta
-    const ingredientes = await client.query(
-      `SELECT id, cantidad FROM receta_detalle WHERE id_receta = $1`,
-      [id_receta]
-    );
-
-    for (const ingrediente of ingredientes.rows) {
-      const idIngrediente = ingrediente.id;
-      const cantidadPorPlato = ingrediente.cantidad;
-      const cantidadTotal = cantidad * cantidadPorPlato;
-
-      // Actualizar el inventario
+    // Descontar el stock
+    for (const ing of ingredientes.rows) {
+      const cantidadTotal = ing.cantidad * cantidad;
       await client.query(
         `UPDATE inventario 
          SET stock = stock - $1 
          WHERE id = $2`,
-        [cantidadTotal, idIngrediente]
+        [cantidadTotal, ing.id_ingrediente]
       );
     }
 
